@@ -20,6 +20,34 @@ export function emulatorOnly(): { projectId: string; db: Firestore } {
   return { projectId, db: getFirestore(app) };
 }
 
+/**
+ * Target for scripts that may also run against a deployed DEMO/STAGING project:
+ * `--project <id> --confirm <id>` selects that project (never one named pilot or
+ * prod), otherwise the emulator guard above applies. Uses gcloud
+ * application-default credentials.
+ */
+export function demoTarget(): { projectId: string; db: Firestore; emulator: boolean } {
+  const arg = (name: string) => {
+    const i = process.argv.indexOf(`--${name}`);
+    return i > 0 ? process.argv[i + 1] : undefined;
+  };
+  const projectId = arg('project');
+  if (!projectId) return { ...emulatorOnly(), emulator: true };
+  const fail = (msg: string): never => {
+    console.error(`Refusing: ${msg}`);
+    process.exit(1);
+  };
+  if (arg('confirm') !== projectId) fail('pass --confirm with the same project ID to confirm.');
+  if (/pilot|prod/i.test(projectId))
+    fail(`"${projectId}" looks like a pilot or production project.`);
+  if (process.env.APP_ENV === 'pilot') fail('APP_ENV is pilot.');
+  delete process.env.FIRESTORE_EMULATOR_HOST;
+  delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
+  process.env.GOOGLE_CLOUD_PROJECT = projectId;
+  const app = getApps()[0] ?? initializeApp({ projectId });
+  return { projectId, db: getFirestore(app), emulator: false };
+}
+
 const DAY = 86_400_000;
 
 /** Writes the synthetic lab. Sandbox slots are shifted so the earliest is tomorrow. */

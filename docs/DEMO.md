@@ -46,7 +46,7 @@ All data is synthetic, and every simulated step is labelled **◌ Simulated** on
 5. **Audio:** headset on, and microphone permission granted for `localhost:3000` in the front-desk window.
 6. **Backup recording:** do one full run and record it. The first frame and the file name must say **"Recorded backup — synthetic data"**. If anything fails live, say so and play it.
 
-`pnpm demo:reset` restores the starting state at any time. The cases are created with due dates relative to today. If you rehearse outside 09:00–19:00 IST, it widens the demo lab's contact hours and tells you so.
+`pnpm demo:reset` restores the starting state at any time. The cases are created with due dates relative to today. If you rehearse outside 09:00–19:00 IST, it widens the demo lab's contact hours to the whole day and tells you so.
 
 ## The script
 

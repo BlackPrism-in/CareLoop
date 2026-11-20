@@ -1,24 +1,39 @@
 import type { Site, Source, SupportedLanguage, ActionType } from '@careloop/contracts';
 import { SandboxBookingAdapter } from '@careloop/adapters';
-import { CaseCommands, FirestoreStore, tenantRecord, type ActorContext } from '@careloop/domain';
+import {
+  CaseCommands,
+  FirestoreStore,
+  tenantDoc,
+  tenantRecord,
+  type ActorContext,
+} from '@careloop/domain';
 import { createHandlers, JobRunner, MemoryQueue, OutboxDispatcher } from '@careloop/jobs';
 import { createLogger } from '@careloop/observability';
-import { emulatorOnly, seedBase, seedLogins } from './seed-lib';
+import { demoTarget, seedBase, seedLogins } from './seed-lib';
 
 /**
- * Resets the EMULATOR to the exact starting state of the 3-minute demo
- * (docs/DEMO.md). Synthetic data only; refuses to run against a real project.
+ * Resets the demo lab to the exact starting state of the 3-minute demo
+ * (docs/DEMO.md). Synthetic data only. Runs on the emulator by default, or on a
+ * deployed demo/staging project with `--project <id> --confirm <id>` (staff
+ * logins there come from `bootstrap:staging`).
  */
-const { projectId, db } = emulatorOnly();
+const { projectId, db, emulator } = demoTarget();
 const log = createLogger('demo-reset');
 log.info = () => undefined;
 
-await fetch(
-  `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${projectId}/databases/(default)/documents`,
-  { method: 'DELETE' },
-);
+const DEMO_TENANT = 't_demo_siliguri';
+if (emulator) {
+  await fetch(
+    `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${projectId}/databases/(default)/documents`,
+    { method: 'DELETE' },
+  );
+} else {
+  // Only the synthetic demo lab is removed; nothing else in the project is touched.
+  await db.recursiveDelete(db.doc(tenantDoc(DEMO_TENANT)));
+}
 const bundle = await seedBase(db, { includeCases: false });
-await seedLogins(bundle);
+if (bundle.tenant.tenantId !== DEMO_TENANT) throw new Error('fixture tenant changed');
+if (emulator) await seedLogins(bundle);
 const t = bundle.tenant.tenantId;
 
 // Contact hours are enforced. If you rehearse outside 09:00–19:00 IST, widen them for the demo lab only.
@@ -33,9 +48,9 @@ if (hourIst < 9 || hourIst >= 19) {
   const site = bundle.sites[0]!;
   await db
     .doc(tenantRecord(t, 'sites', site.siteId))
-    .set({ ...site, contactWindow: { start: '06:00', end: '23:00' } } satisfies Site);
+    .set({ ...site, contactWindow: { start: '00:00', end: '23:59' } } satisfies Site);
   console.log(
-    'Note: outside 09:00–19:00 IST — widened the demo lab contact window to 06:00–23:00.',
+    'Note: outside 09:00–19:00 IST — widened the demo lab contact window to 00:00–23:59.',
   );
 }
 const extraSource: Source = {
@@ -220,5 +235,5 @@ console.log(`Demo reset (synthetic data, ${projectId}):
   CL-2001  Contacting (Hindi)         → 0:25 live call: "can't come during work hours"
   CL-2002  ${booked?.workflowState} (${booked?.bookingRef ?? 'no ref'}) → 1:45 evidence: mismatched, then matching
   CL-2003  Contacting (Hindi)         → 2:15 medical question / opt-out
-Sign in at http://localhost:3000 with the demo accounts in docs/PHASE2.md.`);
+Sign in ${emulator ? 'at http://localhost:3000 with the demo accounts in docs/PHASE2.md' : 'with the bootstrap:staging logins (.env.staging.local)'}.`);
 process.exit(0);
