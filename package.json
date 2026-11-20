@@ -16,7 +16,7 @@
     "seed": "pnpm --filter @careloop/scripts seed",
     "check:models": "pnpm --filter @careloop/scripts check-models",
     "check": "pnpm format:check && pnpm typecheck && pnpm test",
-    "test:emulator": "pnpm --filter @careloop/domain test:emulator"
+    "test:emulator": "pnpm -r --workspace-concurrency=1 --if-present test:emulator"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

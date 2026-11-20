@@ -1,8 +1,16 @@
-import { errorResponse } from '@/http';
+import { staffRoute } from '@/server/handler';
+import { queries } from '@/server/services';
 
 export const dynamic = 'force-dynamic';
 
-/** Phase 2 replaces this with Firebase ID-token verification + membership lookup. */
-export function GET() {
-  return errorResponse('UNAUTHENTICATED', 'Staff authentication is not configured yet.');
-}
+export const GET = staffRoute(async ({ session }) => {
+  const { member, ctx } = session;
+  const lookups = await queries().lookups(ctx.tenantId);
+  return Response.json({
+    uid: member.uid,
+    displayName: member.displayName,
+    roles: member.roleSet,
+    tenant: lookups.tenant,
+    permittedSiteIds: member.permittedSiteIds,
+  });
+});

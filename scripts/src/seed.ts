@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { tenantDoc, tenantRecord } from '@careloop/domain';
 import { loadFixture } from './fixtures';
@@ -35,6 +36,30 @@ for (const s of bundle.sources) batch.set(db.doc(tenantRecord(t, 'sources', s.so
 for (const c of bundle.cases) batch.set(db.doc(tenantRecord(t, 'cases', c.caseId)), c);
 for (const s of bundle.slots) batch.set(db.doc(tenantRecord(t, 'slots', s.slotId)), s);
 await batch.commit();
+
+// Staff logins in the Auth EMULATOR. The tenant is a server-set custom claim;
+// the API still checks the membership document on every request.
+if (process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+  const password = process.env.DEMO_STAFF_PASSWORD;
+  if (!password || password.length < 8) {
+    console.error('Set DEMO_STAFF_PASSWORD (see .env.example) to seed staff logins.');
+    process.exit(1);
+  }
+  const auth = getAuth();
+  for (const m of bundle.members) {
+    try {
+      await auth.updateUser(m.uid, { email: m.email, password, displayName: m.displayName });
+    } catch {
+      await auth.createUser({ uid: m.uid, email: m.email, password, displayName: m.displayName });
+    }
+    await auth.setCustomUserClaims(m.uid, { tenantId: t });
+  }
+  console.log(
+    `Seeded ${bundle.members.length} staff logins in the Auth emulator (password from DEMO_STAFF_PASSWORD).`,
+  );
+} else {
+  console.log('FIREBASE_AUTH_EMULATOR_HOST not set: skipped staff logins.');
+}
 
 console.log(
   `Seeded ${t}: ${bundle.members.length} members, ${bundle.patients.length} patients, ${bundle.cases.length} cases, ${bundle.slots.length} slots (synthetic).`,

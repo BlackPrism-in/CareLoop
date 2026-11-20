@@ -10,3 +10,5 @@ export * from './store';
 export * from './service';
 export * from './memory-store';
 export * from './firestore-store';
+export * from './sources';
+export * from './queries';
