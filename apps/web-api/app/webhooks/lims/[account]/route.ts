@@ -20,5 +20,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ account: strin
     signature: req.headers.get(SIGNATURE_HEADER),
   });
   if (r.http >= 400) log.warn('lims order rejected', { account, reason: r.reason });
-  return Response.json({ status: r.status, caseId: r.caseId ?? null, reason: r.reason ?? null }, { status: r.http });
+  return Response.json(
+    { status: r.status, caseId: r.caseId ?? null, reason: r.reason ?? null },
+    { status: r.http },
+  );
 }

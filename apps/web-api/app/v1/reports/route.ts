@@ -1,6 +1,11 @@
 import { z } from 'zod';
-import type { Case } from '@careloop/contracts';
-import { canAccessSite, tenantCollection, type EvidenceDoc, type HandoffDoc } from '@careloop/domain';
+import type { Case, Site } from '@careloop/contracts';
+import {
+  canAccessSite,
+  tenantCollection,
+  type EvidenceDoc,
+  type HandoffDoc,
+} from '@careloop/domain';
 import { firestore } from '@/server/firebase';
 import { staffRoute } from '@/server/handler';
 
@@ -10,7 +15,10 @@ const Query = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   cohort: z.enum(['due', 'created']).default('due'),
-  site: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),
+  site: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,128}$/)
+    .optional(),
 });
 
 const MAX_CASES = 2000;
@@ -34,15 +42,19 @@ export const GET = staffRoute(async ({ req, session }) => {
     .where(field, '<=', toIso)
     .limit(MAX_CASES + 1)
     .get();
-  const cases = snap.docs.slice(0, MAX_CASES).map((d) => d.data() as Case).filter((c) => canAccessSite(session.ctx, c.siteId) && (!q.site || c.siteId === q.site));
+  const cases = snap.docs
+    .slice(0, MAX_CASES)
+    .map((d) => d.data() as Case)
+    .filter((c) => canAccessSite(session.ctx, c.siteId) && (!q.site || c.siteId === q.site));
   const ids = new Set(cases.map((c) => c.caseId));
 
-  const [evidence, handoffs] = await Promise.all([
+  const [evidence, handoffs, sites] = await Promise.all([
     db
       .collection(tenantCollection(t, 'evidence'))
       .where('status', 'in', ['VERIFIED', 'SELF_REPORTED'])
       .get(),
     db.collection(tenantCollection(t, 'handoffs')).get(),
+    db.collection(tenantCollection(t, 'sites')).get(),
   ]);
   const verifiedAt = new Map<string, string>();
   const selfReported = new Set<string>();
@@ -78,6 +90,31 @@ export const GET = staffRoute(async ({ req, session }) => {
     .map((h) => (Date.parse(h.acknowledgedAt!) - Date.parse(h.createdAt)) / 60_000)
     .sort((a, b) => a - b);
   const count = (pred: (c: Case) => boolean) => enrolled.filter(pred).length;
+
+  // Per-site view (Phase 9): same definitions as the headline rate, one row per site the caller can see.
+  const onTime = new Set(verifiedOnTime.map((c) => c.caseId));
+  const isEligible = new Set(eligible.map((c) => c.caseId));
+  const bySite = sites.docs
+    .map((d) => d.data() as Site)
+    .filter((s) => canAccessSite(session.ctx, s.siteId) && (!q.site || s.siteId === q.site))
+    .map((s) => {
+      const at = enrolled.filter((c) => c.siteId === s.siteId);
+      const el = at.filter((c) => isEligible.has(c.caseId));
+      const num = el.filter((c) => onTime.has(c.caseId)).length;
+      return {
+        siteId: s.siteId,
+        displayName: s.displayName,
+        enrolled: at.length,
+        eligible: el.length,
+        verifiedOnTime: num,
+        rate: el.length ? num / el.length : null,
+        handoffsOpen: hs.filter(
+          (h) => h.status !== 'RESOLVED' && at.some((c) => c.caseId === h.caseId),
+        ).length,
+        optedOut: at.filter((c) => c.outreachDisposition === 'OPTED_OUT').length,
+      };
+    })
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
   return Response.json({
     cohort: {
@@ -123,6 +160,7 @@ export const GET = staffRoute(async ({ req, session }) => {
       contactAttempts: enrolled.reduce((n, c) => n + c.contactAttempts, 0),
       billedVoiceMinutes: Math.round(enrolled.reduce((n, c) => n + c.audioSecondsUsed, 0) / 6) / 10,
     },
+    bySite,
     asOf: new Date().toISOString(),
   });
 });

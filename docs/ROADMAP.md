@@ -154,6 +154,8 @@ Acceptance IDs (`MVP-01`…`MVP-12`) and section numbers (`§`) refer to the MVP
 ## Phase 9 — Later (only after adoption)
 LIMS connectors, FHIR interoperability, multi-site controls and analytics, payments, tamper-evident exports/retention locks, LIMS-reseller channel, additional languages and regions.
 
+**Status:** built ahead of adoption against generic assumptions; see [PHASE9.md](PHASE9.md) for what exists and what each piece still needs from a real partner.
+
 **Explicitly out of scope until then:** disease-specific pathways, raw-result interpretation, unsupervised critical-result handling, insurance, Kubernetes, vector DB, data warehouse, autonomous agent swarm.
 
 ---

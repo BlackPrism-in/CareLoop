@@ -29,6 +29,16 @@ interface Report {
     contactAttempts: number;
     billedVoiceMinutes: number;
   };
+  bySite: {
+    siteId: string;
+    displayName: string;
+    enrolled: number;
+    eligible: number;
+    verifiedOnTime: number;
+    rate: number | null;
+    handoffsOpen: number;
+    optedOut: number;
+  }[];
   asOf: string;
 }
 
@@ -54,9 +64,18 @@ export default function ReportsPage() {
   const [from, setFrom] = useState(iso(new Date(Date.now() - 30 * 86_400_000)));
   const [to, setTo] = useState(iso(new Date(Date.now() + 14 * 86_400_000)));
   const [cohort, setCohort] = useState<'due' | 'created'>('due');
+  const [site, setSite] = useState('');
+  const lookups = useData<{ sites: { siteId: string; displayName: string }[] }>(
+    () => api('/v1/lookups'),
+    [],
+  );
+  const sites = lookups.data?.sites ?? [];
   const { data, error, loading, refresh } = useData<Report>(
-    () => api<Report>(`/v1/reports?from=${from}&to=${to}&cohort=${cohort}`),
-    [from, to, cohort],
+    () =>
+      api<Report>(
+        `/v1/reports?from=${from}&to=${to}&cohort=${cohort}${site ? `&site=${encodeURIComponent(site)}` : ''}`,
+      ),
+    [from, to, cohort, site],
   );
 
   return (
@@ -78,6 +97,18 @@ export default function ReportsPage() {
             <option value="created">Created date</option>
           </select>
         </Field>
+        {sites.length > 1 && (
+          <Field label="Site">
+            <select className={inputClass} value={site} onChange={(e) => setSite(e.target.value)}>
+              <option value="">All my sites</option>
+              {sites.map((s) => (
+                <option key={s.siteId} value={s.siteId}>
+                  {s.displayName}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field label="From">
           <input
             type="date"
@@ -181,6 +212,7 @@ export default function ReportsPage() {
               {data.cohort.cases} cases in cohort · as of{' '}
               {new Date(data.asOf).toLocaleTimeString('en-IN')}
             </p>
+            <BySite rows={data.bySite ?? []} />
           </>
         )
       )}
@@ -234,6 +266,48 @@ function Economics({ enrolled }: { enrolled: number }) {
       <p className="mt-2 text-xs text-[var(--muted)]">
         Applies only to ordered tests performed at the paying lab; consultation-only cases
         contribute admin savings, not test revenue. This cohort has {enrolled} approved cases.
+      </p>
+    </Card>
+  );
+}
+
+/** One row per site, same definitions as the headline rate. */
+function BySite({ rows }: { rows: Report['bySite'] }) {
+  if (rows.length < 2) return null;
+  const pct = (r: number | null) => (r === null ? '—' : `${Math.round(r * 100)}%`);
+  return (
+    <Card title="By site">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <caption className="sr-only">Follow-through by site</caption>
+          <thead className="text-xs text-[var(--muted)]">
+            <tr>
+              <th className="py-1 pr-3 font-normal">Site</th>
+              <th className="py-1 pr-3 text-right font-normal">Approved</th>
+              <th className="py-1 pr-3 text-right font-normal">Window closed</th>
+              <th className="py-1 pr-3 text-right font-normal">Verified on time</th>
+              <th className="py-1 pr-3 text-right font-normal">Open handoffs</th>
+              <th className="py-1 pr-3 text-right font-normal">Opted out</th>
+            </tr>
+          </thead>
+          <tbody className="tabular-nums">
+            {rows.map((r) => (
+              <tr key={r.siteId} className="border-t border-[var(--line)]">
+                <td className="py-1.5 pr-3">{r.displayName}</td>
+                <td className="py-1.5 pr-3 text-right">{r.enrolled}</td>
+                <td className="py-1.5 pr-3 text-right">{r.eligible}</td>
+                <td className="py-1.5 pr-3 text-right">
+                  {r.verifiedOnTime} <span className="text-[var(--muted)]">({pct(r.rate)})</span>
+                </td>
+                <td className="py-1.5 pr-3 text-right">{r.handoffsOpen}</td>
+                <td className="py-1.5 pr-3 text-right">{r.optedOut}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-xs text-[var(--muted)]">
+        Small sites give unstable percentages; compare counts as well as rates.
       </p>
     </Card>
   );

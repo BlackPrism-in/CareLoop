@@ -12,9 +12,12 @@ export function ExportButton({ caseId }: { caseId: string }) {
   async function download(format: 'json' | 'fhir') {
     setError(null);
     const token = await clientAuth().currentUser?.getIdToken();
-    const res = await fetch(`/v1/cases/${caseId}/export${format === 'fhir' ? '?format=fhir' : ''}`, {
-      headers: { authorization: `Bearer ${token}` },
-    });
+    const res = await fetch(
+      `/v1/cases/${caseId}/export${format === 'fhir' ? '?format=fhir' : ''}`,
+      {
+        headers: { authorization: `Bearer ${token}` },
+      },
+    );
     if (!res.ok) return setError('Export failed.');
     const url = URL.createObjectURL(await res.blob());
     const a = Object.assign(document.createElement('a'), {

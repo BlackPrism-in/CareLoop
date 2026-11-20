@@ -37,7 +37,12 @@ export const AppConfig = z.object({
   ENABLED_LANGUAGES: z
     .string()
     .default('hi-IN,en-IN')
-    .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean))
+    .transform((s) =>
+      s
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean),
+    )
     .pipe(z.array(SupportedLanguage).min(1)),
   /** Staff must sign in with a second factor (TOTP). Required in the pilot. */
   REQUIRE_STAFF_MFA: bool,

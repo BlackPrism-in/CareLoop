@@ -19,9 +19,11 @@ export const GET = staffRoute(async ({ req, session }) => {
     .where('status', 'in', status)
     .limit(100)
     .get();
-  const rows = await filterBySite(t, snap.docs
-    .map((d) => d.data() as HandoffDoc)
-    .sort((a, b) => a.dueAt.localeCompare(b.dueAt)), session.ctx.siteIds);
+  const rows = await filterBySite(
+    t,
+    snap.docs.map((d) => d.data() as HandoffDoc).sort((a, b) => a.dueAt.localeCompare(b.dueAt)),
+    session.ctx.siteIds,
+  );
   const cases = rows.length
     ? await db.getAll(
         ...[...new Set(rows.map((r) => r.caseId))].map((id) =>

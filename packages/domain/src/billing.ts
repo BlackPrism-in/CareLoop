@@ -63,7 +63,10 @@ export function buildStatement(i: {
   tenantId: string;
   month: string;
   sites: Pick<Site, 'siteId' | 'displayName'>[];
-  cases: Pick<Case, 'caseId' | 'siteId' | 'workflowState' | 'approvedAt' | 'pilotArm' | 'createdAt'>[];
+  cases: Pick<
+    Case,
+    'caseId' | 'siteId' | 'workflowState' | 'approvedAt' | 'pilotArm' | 'createdAt'
+  >[];
   alreadyBilled: ReadonlySet<string>;
   pricing?: Pricing;
   simulation: boolean;
@@ -73,7 +76,8 @@ export function buildStatement(i: {
   const pricing = i.pricing ?? DEFAULT_PRICING;
   const { end } = monthBounds(i.month);
   const billable = i.cases.filter(
-    (c) => !i.alreadyBilled.has(c.caseId) && Date.parse(c.createdAt) < end.getTime() && isEnrolled(c),
+    (c) =>
+      !i.alreadyBilled.has(c.caseId) && Date.parse(c.createdAt) < end.getTime() && isEnrolled(c),
   );
   const bySite = new Map<string, string[]>();
   for (const c of billable) bySite.set(c.siteId, [...(bySite.get(c.siteId) ?? []), c.caseId]);

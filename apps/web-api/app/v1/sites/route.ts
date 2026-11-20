@@ -10,15 +10,21 @@ export const dynamic = 'force-dynamic';
 
 /** Sites the caller may see, with their contact hours. */
 export const GET = staffRoute(async ({ session }) => {
-  const snap = await firestore().collection(tenantCollection(session.ctx.tenantId, 'sites')).limit(100).get();
+  const snap = await firestore()
+    .collection(tenantCollection(session.ctx.tenantId, 'sites'))
+    .limit(100)
+    .get();
   const scope = session.ctx.siteIds;
-  const items = snap.docs.map((d) => d.data() as Site).filter((s) => scope === undefined || scope === 'ALL' || scope.includes(s.siteId));
+  const items = snap.docs
+    .map((d) => d.data() as Site)
+    .filter((s) => scope === undefined || scope === 'ALL' || scope.includes(s.siteId));
   return Response.json({ items });
 });
 
 /** Owner-only: add or update a site (multi-site labs). Audited. */
 export const POST = staffRoute(async ({ req, session }) => {
-  if (!session.ctx.roles.includes('OWNER')) throw new HttpError('FORBIDDEN', 'Only an owner can manage sites');
+  if (!session.ctx.roles.includes('OWNER'))
+    throw new HttpError('FORBIDDEN', 'Only an owner can manage sites');
   const body = SiteBody.parse(await jsonBody(req));
   try {
     new Intl.DateTimeFormat('en', { timeZone: body.timeZone });
@@ -30,7 +36,13 @@ export const POST = staffRoute(async ({ req, session }) => {
   const auditId = randomUUID();
   const batch = db.batch();
   batch.set(db.doc(tenantRecord(session.ctx.tenantId, 'sites', body.siteId)), body satisfies Site);
-  batch.set(db.doc(tenantRecord(session.ctx.tenantId, 'audit', auditId)), { auditId, action: 'SITE_SAVED', siteId: body.siteId, actorId: session.ctx.actorId, at: now });
+  batch.set(db.doc(tenantRecord(session.ctx.tenantId, 'audit', auditId)), {
+    auditId,
+    action: 'SITE_SAVED',
+    siteId: body.siteId,
+    actorId: session.ctx.actorId,
+    at: now,
+  });
   await batch.commit();
   return Response.json(body, { status: 201 });
 });

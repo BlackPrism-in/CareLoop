@@ -88,7 +88,11 @@ beforeAll(async () => {
   batch.set(db.doc(tenantRecord(A, 'members', 'a_owner')), member('a_owner'));
   batch.set(db.doc(tenantRecord(B, 'members', 'b_all')), member('b_all'));
   // Same lab as A, but only allowed at a different site.
-  batch.set(db.doc(tenantRecord(A, 'sites', 'site_north')), { ...site, siteId: 'site_north', displayName: 'North' });
+  batch.set(db.doc(tenantRecord(A, 'sites', 'site_north')), {
+    ...site,
+    siteId: 'site_north',
+    displayName: 'North',
+  });
   batch.set(db.doc(tenantRecord(A, 'members', 'a_north')), {
     ...member('a_north'),
     roleSet: ['REVIEWER', 'COORDINATOR', 'VERIFIER'],
@@ -256,7 +260,11 @@ beforeAll(async () => {
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: `${uid}@iso.careloop.test`, password: PASSWORD, returnSecureToken: true }),
+        body: JSON.stringify({
+          email: `${uid}@iso.careloop.test`,
+          password: PASSWORD,
+          returnSecureToken: true,
+        }),
       },
     );
     return ((await res.json()) as { idToken: string }).idToken;
@@ -474,9 +482,16 @@ describe('tenant isolation sweep', () => {
     expect(await snapshotA()).toEqual(before);
   });
 
-  it('a member of the same lab limited to another site cannot read or change that site\'s case', async () => {
+  it("a member of the same lab limited to another site cannot read or change that site's case", async () => {
     // Patients, consents and the lab name are lab-wide, so only case-specific values count as leaks.
-    const CASE_MARKERS = ['CL-ISO-A', 'secret action text', 'ev_iso_a', 'ext_bk_a', 'job_iso_a', 'int_a_secret'];
+    const CASE_MARKERS = [
+      'CL-ISO-A',
+      'secret action text',
+      'ev_iso_a',
+      'ext_bk_a',
+      'job_iso_a',
+      'int_a_secret',
+    ];
     // Lists and lab-level actions may succeed; anything aimed at the case may not.
     const MAY_SUCCEED = (method: string, route: string) =>
       (method === 'GET' && (OWN_TENANT_ROUTES.has(route) || OWN_TENANT_GETS.has(route))) ||
@@ -491,7 +506,10 @@ describe('tenant isolation sweep', () => {
         const res = await handler(
           new Request(`http://localhost${route}${query}`, {
             method,
-            headers: { authorization: `Bearer ${tokenNorth}`, 'idempotency-key': `north-${method}-${route}` },
+            headers: {
+              authorization: `Bearer ${tokenNorth}`,
+              'idempotency-key': `north-${method}-${route}`,
+            },
             body: method === 'GET' ? undefined : JSON.stringify(bodyFor(route)),
           }),
           { params: Promise.resolve(paramsFor(route)) },

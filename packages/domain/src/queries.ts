@@ -20,7 +20,8 @@ import { caseEvents, tenantCollection, tenantDoc, tenantRecord } from './paths';
 
 /** Site scope from the actor context: 'ALL'/undefined = every site. */
 export type SiteScope = readonly string[] | 'ALL' | undefined;
-const inScope = (scope: SiteScope, siteId: string) => scope === undefined || scope === 'ALL' || scope.includes(siteId);
+const inScope = (scope: SiteScope, siteId: string) =>
+  scope === undefined || scope === 'ALL' || scope.includes(siteId);
 
 export interface CaseListFilter {
   siteIds?: SiteScope;
@@ -139,7 +140,8 @@ export class CaseQueries {
   /** Counts for the overview tiles. Uses aggregation queries, not document reads. */
   async overview(tenantId: string, uid: string, scope?: SiteScope) {
     let c: Query = this.cases(tenantId);
-    if (scope !== undefined && scope !== 'ALL') c = c.where('siteId', 'in', scope.length ? scope.slice(0, 30) : ['__none__']);
+    if (scope !== undefined && scope !== 'ALL')
+      c = c.where('siteId', 'in', scope.length ? scope.slice(0, 30) : ['__none__']);
     const count = async (q: Query) => (await q.count().get()).data().count;
     const [needApproval, handoffsPending, booked, proofToReview, mine] = await Promise.all([
       count(c.where('workflowState', '==', 'DRAFT')),
@@ -235,7 +237,9 @@ export class CaseQueries {
       tenant: t
         ? { tenantId, displayName: t.displayName as string, simulation: t.simulation as boolean }
         : null,
-      sites: sites.docs.filter((d) => inScope(scope, d.id)).map((d) => ({ siteId: d.id, displayName: (d.data() as Site).displayName })),
+      sites: sites.docs
+        .filter((d) => inScope(scope, d.id))
+        .map((d) => ({ siteId: d.id, displayName: (d.data() as Site).displayName })),
       members: members.docs.map((d) => {
         const m = d.data() as Member;
         return { uid: m.uid, displayName: m.displayName, roleSet: m.roleSet };

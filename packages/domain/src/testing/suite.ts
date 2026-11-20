@@ -114,8 +114,16 @@ export function commandSuite(name: string, backend: () => TestBackend) {
       expect(verifyChain(evs, head)).toMatchObject({ ok: true, checked: evs.length, unchained: 0 });
       const edited = evs.map((e, i) => (i === 2 ? { ...e, actorId: 'someone_else' } : e));
       expect(verifyChain(edited, head)).toMatchObject({ ok: false, reason: 'HASH_MISMATCH' });
-      expect(verifyChain(evs.filter((_, i) => i !== 3), head).ok).toBe(false);
-      expect(verifyChain(evs.slice(0, -1), head)).toMatchObject({ ok: false, reason: 'HEAD_MISMATCH' });
+      expect(
+        verifyChain(
+          evs.filter((_, i) => i !== 3),
+          head,
+        ).ok,
+      ).toBe(false);
+      expect(verifyChain(evs.slice(0, -1), head)).toMatchObject({
+        ok: false,
+        reason: 'HEAD_MISMATCH',
+      });
       const swapped = evs.map((e, i) =>
         i === 1 ? { ...evs[2]!, nextVersion: 2 } : i === 2 ? { ...evs[1]!, nextVersion: 3 } : e,
       );
@@ -131,18 +139,39 @@ export function commandSuite(name: string, backend: () => TestBackend) {
         patientExternalRef: 'LAB-REF-1',
         events: await events(),
         bookings: [
-          { bookingId: 'bk1', status: 'CONFIRMED', startsAt: '2026-11-23T11:00:00Z', location: 'Room 2', externalRef: 'EXT-1', simulation: true },
-          { bookingId: 'bk0', status: 'REJECTED', startsAt: null, location: null, externalRef: null, simulation: true },
+          {
+            bookingId: 'bk1',
+            status: 'CONFIRMED',
+            startsAt: '2026-11-23T11:00:00Z',
+            location: 'Room 2',
+            externalRef: 'EXT-1',
+            simulation: true,
+          },
+          {
+            bookingId: 'bk0',
+            status: 'REJECTED',
+            startsAt: null,
+            location: null,
+            externalRef: null,
+            simulation: true,
+          },
         ],
         generatedAt: '2026-11-22T00:00:00Z',
-      }) as unknown as { type: string; entry: { fullUrl: string; resource: Record<string, unknown> & { resourceType: string; id: string } }[] };
+      }) as unknown as {
+        type: string;
+        entry: {
+          fullUrl: string;
+          resource: Record<string, unknown> & { resourceType: string; id: string };
+        }[];
+      };
       expect(bundle.type).toBe('collection');
       const types = bundle.entry.map((e) => e.resource.resourceType);
       expect(types).toEqual(['Patient', 'ServiceRequest', 'Task', 'Appointment', 'Provenance']);
       const json = JSON.stringify(bundle);
       // Every reference resolves inside the bundle.
       const ids = new Set(bundle.entry.map((e) => `${e.resource.resourceType}/${e.resource.id}`));
-      for (const m of json.matchAll(/"reference":"([^"]+)"/g)) expect(ids.has(m[1]!), m[1]).toBe(true);
+      for (const m of json.matchAll(/"reference":"([^"]+)"/g))
+        expect(ids.has(m[1]!), m[1]).toBe(true);
       const patient = bundle.entry[0]!.resource;
       expect(Object.keys(patient).sort()).toEqual(['id', 'identifier', 'meta', 'resourceType']);
       const task = bundle.entry[2]!.resource;
@@ -153,7 +182,10 @@ export function commandSuite(name: string, backend: () => TestBackend) {
     it('refuses a language that is not switched on, at creation and at contact', async () => {
       const off = make({ enabledLanguages: ['hi-IN', 'en-IN'] });
       await expect(
-        off.createCase(coordinator, { idempotencyKey: 'bn', input: newCase({ caseId: 'CL-BN', language: 'bn-IN' }) }),
+        off.createCase(coordinator, {
+          idempotencyKey: 'bn',
+          input: newCase({ caseId: 'CL-BN', language: 'bn-IN' }),
+        }),
       ).rejects.toMatchObject({ reason: 'LANGUAGE_NOT_ENABLED' });
     });
 

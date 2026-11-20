@@ -27,7 +27,10 @@ export function canAccessSite(ctx: Pick<ActorContext, 'siteIds'>, siteId: string
 }
 
 /** Owners and auditors see every site; other staff only their permitted sites. */
-export function siteScopeFor(roles: readonly StaffRole[], permittedSiteIds: readonly string[]): readonly string[] | 'ALL' {
+export function siteScopeFor(
+  roles: readonly StaffRole[],
+  permittedSiteIds: readonly string[],
+): readonly string[] | 'ALL' {
   return roles.some((r) => r === 'OWNER' || r === 'AUDITOR') ? 'ALL' : permittedSiteIds;
 }
 

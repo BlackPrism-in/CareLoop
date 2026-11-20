@@ -15,7 +15,18 @@ export const GET = staffRoute<{ id: string }>(async ({ session, params }) => {
   if (!session.ctx.roles.some((r) => r === 'OWNER' || r === 'AUDITOR'))
     throw new HttpError('FORBIDDEN', 'Only owners and auditors can check integrity');
   const c = await loadCase(session.ctx.tenantId, params.id, session.ctx.siteIds);
-  const snap = await firestore().collection(caseEvents(session.ctx.tenantId, c.caseId)).limit(2000).get();
-  const result = verifyChain(snap.docs.map((d) => d.data() as EventEnvelope), c.lastEventHash);
-  return Response.json({ caseId: c.caseId, version: c.version, headHash: c.lastEventHash ?? null, ...result });
+  const snap = await firestore()
+    .collection(caseEvents(session.ctx.tenantId, c.caseId))
+    .limit(2000)
+    .get();
+  const result = verifyChain(
+    snap.docs.map((d) => d.data() as EventEnvelope),
+    c.lastEventHash,
+  );
+  return Response.json({
+    caseId: c.caseId,
+    version: c.version,
+    headHash: c.lastEventHash ?? null,
+    ...result,
+  });
 });

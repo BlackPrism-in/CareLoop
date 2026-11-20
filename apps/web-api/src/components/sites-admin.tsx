@@ -27,7 +27,13 @@ export function SitesAdmin() {
   const sites = useData<{ items: SiteRow[] }>(() => api('/v1/sites'), []);
   const members = useData<{ items: MemberRow[] }>(() => api('/v1/members'), []);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
-  const [form, setForm] = useState({ siteId: '', displayName: '', timeZone: 'Asia/Kolkata', start: '09:00', end: '19:00' });
+  const [form, setForm] = useState({
+    siteId: '',
+    displayName: '',
+    timeZone: 'Asia/Kolkata',
+    start: '09:00',
+    end: '19:00',
+  });
 
   async function addSite() {
     try {
@@ -53,7 +59,10 @@ export function SitesAdmin() {
       ? m.permittedSiteIds.filter((s) => s !== siteId)
       : [...m.permittedSiteIds, siteId];
     try {
-      await api(`/v1/members/${encodeURIComponent(m.uid)}/sites`, { method: 'POST', body: { permittedSiteIds: next } });
+      await api(`/v1/members/${encodeURIComponent(m.uid)}/sites`, {
+        method: 'POST',
+        body: { permittedSiteIds: next },
+      });
       void members.refresh();
     } catch (e) {
       setMsg({ tone: 'error', text: describeError(e) });
@@ -82,19 +91,41 @@ export function SitesAdmin() {
         )}
         <div className="grid gap-2 md:grid-cols-5">
           <Field label="Site ID">
-            <input className={inputClass} value={form.siteId} onChange={(e) => setForm({ ...form, siteId: e.target.value })} />
+            <input
+              className={inputClass}
+              value={form.siteId}
+              onChange={(e) => setForm({ ...form, siteId: e.target.value })}
+            />
           </Field>
           <Field label="Name">
-            <input className={inputClass} value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} />
+            <input
+              className={inputClass}
+              value={form.displayName}
+              onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+            />
           </Field>
           <Field label="Time zone">
-            <input className={inputClass} value={form.timeZone} onChange={(e) => setForm({ ...form, timeZone: e.target.value })} />
+            <input
+              className={inputClass}
+              value={form.timeZone}
+              onChange={(e) => setForm({ ...form, timeZone: e.target.value })}
+            />
           </Field>
           <Field label="Calls from">
-            <input type="time" className={inputClass} value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} />
+            <input
+              type="time"
+              className={inputClass}
+              value={form.start}
+              onChange={(e) => setForm({ ...form, start: e.target.value })}
+            />
           </Field>
           <Field label="Calls until">
-            <input type="time" className={inputClass} value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} />
+            <input
+              type="time"
+              className={inputClass}
+              value={form.end}
+              onChange={(e) => setForm({ ...form, end: e.target.value })}
+            />
           </Field>
         </div>
         <Button disabled={!form.siteId.trim() || !form.displayName.trim()} onClick={addSite}>
@@ -122,7 +153,9 @@ export function SitesAdmin() {
                     <tr key={m.uid} className="border-t border-[var(--line)]">
                       <td className="py-1.5 pr-3">
                         {m.displayName}
-                        <div className="text-xs text-[var(--muted)]">{m.roleSet.join(', ').toLowerCase()}</div>
+                        <div className="text-xs text-[var(--muted)]">
+                          {m.roleSet.join(', ').toLowerCase()}
+                        </div>
                       </td>
                       {siteList.map((s) => (
                         <td key={s.siteId} className="py-1.5 pr-3">

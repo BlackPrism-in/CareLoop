@@ -15,7 +15,9 @@ const ownerOnly = (roles: readonly string[]) => {
 /** Issued monthly statements, newest first (without the case id lists). */
 export const GET = staffRoute(async ({ session }) => {
   ownerOnly(session.ctx.roles);
-  const snap = await firestore().collection(tenantCollection(session.ctx.tenantId, 'invoices')).get();
+  const snap = await firestore()
+    .collection(tenantCollection(session.ctx.tenantId, 'invoices'))
+    .get();
   const items = snap.docs
     .map((d) => d.data() as BillingStatement)
     .map(({ caseIds, ...s }) => ({ ...s, enrolledCases: caseIds.length }))
@@ -27,10 +29,23 @@ export const GET = staffRoute(async ({ session }) => {
 export const POST = staffRoute(async ({ req, session }) => {
   ownerOnly(session.ctx.roles);
   const { month } = StatementBody.parse(await jsonBody(req));
-  const { statement, created } = await issueStatement(session.ctx.tenantId, month, session.ctx.actorId);
+  const { statement, created } = await issueStatement(
+    session.ctx.tenantId,
+    month,
+    session.ctx.actorId,
+  );
   if (created) {
     const auditId = randomUUID();
-    await firestore().doc(tenantRecord(session.ctx.tenantId, 'audit', auditId)).set({ auditId, action: 'STATEMENT_ISSUED', month, totalInr: statement.totalInr, actorId: session.ctx.actorId, at: statement.issuedAt });
+    await firestore()
+      .doc(tenantRecord(session.ctx.tenantId, 'audit', auditId))
+      .set({
+        auditId,
+        action: 'STATEMENT_ISSUED',
+        month,
+        totalInr: statement.totalInr,
+        actorId: session.ctx.actorId,
+        at: statement.issuedAt,
+      });
   }
   const { caseIds, ...rest } = statement;
   return Response.json({ ...rest, enrolledCases: caseIds.length }, { status: created ? 201 : 200 });

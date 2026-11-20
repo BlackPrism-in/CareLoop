@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { EventEnvelope, Patient } from '@careloop/contracts';
-import { buildFhirBundle, caseEvents, tenantCollection, tenantRecord, verifyChain, type FhirBookingInput } from '@careloop/domain';
+import {
+  buildFhirBundle,
+  caseEvents,
+  tenantCollection,
+  tenantRecord,
+  verifyChain,
+  type FhirBookingInput,
+} from '@careloop/domain';
 import { loadCase } from '@/server/case-helpers';
 import { HttpError } from '@/server/errors';
 import { firestore } from '@/server/firebase';
@@ -41,7 +48,8 @@ export const GET = staffRoute<{ id: string }>(async ({ req, session, params }) =
     correlationId: session.ctx.correlationId,
   });
   if (format === 'fhir') {
-    const patient = (await db.doc(tenantRecord(t, 'patients', c.patientId)).get()).data() as Patient | undefined;
+    const patient = (await db.doc(tenantRecord(t, 'patients', c.patientId)).get()).data() as
+      Patient | undefined;
     const bundle = buildFhirBundle({
       tenantId: t,
       case: c,
@@ -64,7 +72,13 @@ export const GET = staffRoute<{ id: string }>(async ({ req, session, params }) =
     case: c,
     events: events.docs.map((d) => d.data()),
     // Tamper evidence: whether the event history still matches its hash chain and the case head.
-    integrity: { ...verifyChain(events.docs.map((d) => d.data() as EventEnvelope), c.lastEventHash), headHash: c.lastEventHash ?? null },
+    integrity: {
+      ...verifyChain(
+        events.docs.map((d) => d.data() as EventEnvelope),
+        c.lastEventHash,
+      ),
+      headHash: c.lastEventHash ?? null,
+    },
     evidence: evidence.docs.map((d) => d.data()),
     handoffs: handoffs.docs.map((d) => d.data()),
     bookings: bookings.docs.map((d) => d.data()),

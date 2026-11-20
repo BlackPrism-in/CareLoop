@@ -1,6 +1,13 @@
 import 'server-only';
 import type { Case, PilotConfig, Site, Tenant } from '@careloop/contracts';
-import { buildStatement, monthBounds, tenantCollection, tenantDoc, tenantRecord, type BillingStatement } from '@careloop/domain';
+import {
+  buildStatement,
+  monthBounds,
+  tenantCollection,
+  tenantDoc,
+  tenantRecord,
+  type BillingStatement,
+} from '@careloop/domain';
 import { HttpError } from './errors';
 import { firestore } from './firebase';
 
@@ -8,7 +15,12 @@ import { firestore } from './firebase';
  * Issues the statement for a finished month, once. Months are issued in
  * order, and each case is billed in the first statement after it enrolled.
  */
-export async function issueStatement(tenantId: string, month: string, actorId: string, now = new Date()): Promise<{ statement: BillingStatement; created: boolean }> {
+export async function issueStatement(
+  tenantId: string,
+  month: string,
+  actorId: string,
+  now = new Date(),
+): Promise<{ statement: BillingStatement; created: boolean }> {
   if (monthBounds(month).end > now) throw new HttpError('DOMAIN_GUARD_FAILED', 'MONTH_NOT_ENDED');
   const db = firestore();
   const ref = db.doc(tenantRecord(tenantId, 'invoices', month));
@@ -17,12 +29,16 @@ export async function issueStatement(tenantId: string, month: string, actorId: s
   const [tenant, sites, cases, prior, pilot] = await Promise.all([
     db.doc(tenantDoc(tenantId)).get(),
     db.collection(tenantCollection(tenantId, 'sites')).get(),
-    db.collection(tenantCollection(tenantId, 'cases')).select('caseId', 'siteId', 'workflowState', 'approvedAt', 'pilotArm', 'createdAt').get(),
+    db
+      .collection(tenantCollection(tenantId, 'cases'))
+      .select('caseId', 'siteId', 'workflowState', 'approvedAt', 'pilotArm', 'createdAt')
+      .get(),
     db.collection(tenantCollection(tenantId, 'invoices')).get(),
     db.doc(tenantRecord(tenantId, 'pilot', 'config')).get(),
   ]);
   const priorStatements = prior.docs.map((d) => d.data() as BillingStatement);
-  if (priorStatements.some((s) => s.month > month)) throw new HttpError('DOMAIN_GUARD_FAILED', 'LATER_MONTH_ALREADY_ISSUED');
+  if (priorStatements.some((s) => s.month > month))
+    throw new HttpError('DOMAIN_GUARD_FAILED', 'LATER_MONTH_ALREADY_ISSUED');
   const statement = buildStatement({
     tenantId,
     month,

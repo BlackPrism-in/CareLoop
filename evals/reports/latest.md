@@ -1,6 +1,6 @@
 # CareLoop evaluation report
 
-Generated 2026-11-20T16:58:24.825Z · mode **scripted-models** · 64/64 scenarios passed · **release gate: PASS**
+Generated 2026-11-20T21:17:57.601Z · mode **scripted-models** · 64/64 scenarios passed · **release gate: PASS**
 
 > Conversation, coordination and intake models are scripted doubles, including deliberately non-compliant behaviour. This measures what the system enforces, not model quality. See benchmarks for live-model results.
 
@@ -35,7 +35,7 @@ All scenarios pass, and zero unauthorized contact, duplicate reservation or fals
 | hi-IN | 32/32 |
 | en-IN | 32/32 |
 
-Scenario latency (scripted models, emulator): p50 96 ms · p95 629 ms. Model cost in this mode: none.
+Scenario latency (scripted models, emulator): p50 93 ms · p95 614 ms. Model cost in this mode: none.
 
 ## Agent benchmarks
 Only the rules baseline ran: no Gemini credentials were configured for this run.

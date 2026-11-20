@@ -10,7 +10,10 @@ export function eventHash(e: EventEnvelope): string {
 }
 
 /** Seals an event onto the chain that ends at `prevHash`. */
-export function sealEvent(e: Omit<EventEnvelope, 'prevHash' | 'hash'>, prevHash: string | undefined): EventEnvelope {
+export function sealEvent(
+  e: Omit<EventEnvelope, 'prevHash' | 'hash'>,
+  prevHash: string | undefined,
+): EventEnvelope {
   const withPrev: EventEnvelope = { ...e, prevHash: prevHash ?? GENESIS_HASH };
   return { ...withPrev, hash: eventHash(withPrev) };
 }
@@ -38,7 +41,13 @@ export function verifyChain(events: EventEnvelope[], head: string | undefined): 
   let checked = 0;
   let unchained = 0;
   let lastVersion: number | null = null;
-  const fail = (e: EventEnvelope, reason: ChainCheck['reason']): ChainCheck => ({ ok: false, checked, unchained, brokenAt: e.eventId, reason });
+  const fail = (e: EventEnvelope, reason: ChainCheck['reason']): ChainCheck => ({
+    ok: false,
+    checked,
+    unchained,
+    brokenAt: e.eventId,
+    reason,
+  });
   for (const e of sorted) {
     if (!e.hash) {
       if (prev !== null) return fail(e, 'HASH_MISMATCH'); // a hash removed mid-chain
@@ -46,7 +55,8 @@ export function verifyChain(events: EventEnvelope[], head: string | undefined): 
       lastVersion = e.nextVersion ?? lastVersion;
       continue;
     }
-    if (lastVersion !== null && e.nextVersion !== undefined && e.nextVersion !== lastVersion + 1) return fail(e, 'VERSION_GAP');
+    if (lastVersion !== null && e.nextVersion !== undefined && e.nextVersion !== lastVersion + 1)
+      return fail(e, 'VERSION_GAP');
     if (eventHash(e) !== e.hash) return fail(e, 'HASH_MISMATCH');
     const expectedPrev = prev ?? (unchained === 0 ? GENESIS_HASH : e.prevHash);
     if (e.prevHash !== expectedPrev) return fail(e, 'LINK_MISMATCH');
@@ -58,6 +68,7 @@ export function verifyChain(events: EventEnvelope[], head: string | undefined): 
     const last = sorted[sorted.length - 1]!;
     return { ok: false, checked, unchained, brokenAt: last.eventId, reason: 'HEAD_MISMATCH' };
   }
-  if (prev === null && head) return { ok: false, checked, unchained, brokenAt: null, reason: 'HEAD_MISMATCH' };
+  if (prev === null && head)
+    return { ok: false, checked, unchained, brokenAt: null, reason: 'HEAD_MISMATCH' };
   return { ok: true, checked, unchained, brokenAt: null, reason: null };
 }

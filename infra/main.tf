@@ -35,6 +35,7 @@ locals {
     REQUIRE_STAFF_MFA      = var.app_env == "pilot" ? "true" : "false"
     MAX_CONTACT_ATTEMPTS   = "2"
     MAX_CASE_AUDIO_SECONDS = "180"
+    ENABLED_LANGUAGES      = var.enabled_languages
     CLOUD_TASKS_QUEUE      = google_cloud_tasks_queue.jobs.name
     TASK_QUEUE_MODE        = "cloud-tasks"
     TASKS_INVOKER_EMAIL    = google_service_account.svc["tasks-invoker"].email

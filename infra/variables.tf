@@ -46,3 +46,13 @@ variable "alert_email" {
   default     = ""
   description = "Named on-call operator for alerts (MVP spec §20: never an unmonitored inbox). Empty disables alerting."
 }
+
+variable "enabled_languages" {
+  description = "Comma-separated case/contact languages. Add bn-IN only after a supervised Bengali review."
+  type        = string
+  default     = "hi-IN,en-IN"
+  validation {
+    condition     = alltrue([for l in split(",", var.enabled_languages) : contains(["hi-IN", "en-IN", "bn-IN"], trimspace(l))])
+    error_message = "enabled_languages may contain only hi-IN, en-IN and bn-IN."
+  }
+}

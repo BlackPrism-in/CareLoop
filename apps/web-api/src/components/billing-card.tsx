@@ -11,7 +11,13 @@ interface Statement {
   enrolledCases: number;
   simulation: boolean;
   issuedAt: string;
-  lines: { siteId: string; description: string; quantity: number; unitInr: number; amountInr: number }[];
+  lines: {
+    siteId: string;
+    description: string;
+    quantity: number;
+    unitInr: number;
+    amountInr: number;
+  }[];
 }
 
 const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`;
@@ -25,7 +31,10 @@ function lastMonth(): string {
 
 /** Owner billing: site fee per month plus each newly enrolled follow-up, billed once. */
 export function BillingCard() {
-  const { data, error, loading, refresh } = useData<{ items: Statement[] }>(() => api('/v1/billing/statements'), []);
+  const { data, error, loading, refresh } = useData<{ items: Statement[] }>(
+    () => api('/v1/billing/statements'),
+    [],
+  );
   const [month, setMonth] = useState(lastMonth());
   const [msg, setMsg] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
@@ -41,10 +50,15 @@ export function BillingCard() {
 
   async function csv(m: string) {
     const token = await clientAuth().currentUser?.getIdToken();
-    const res = await fetch(`/v1/billing/statements/${m}?format=csv`, { headers: { authorization: `Bearer ${token}` } });
+    const res = await fetch(`/v1/billing/statements/${m}?format=csv`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
     if (!res.ok) return setMsg({ tone: 'error', text: 'Download failed.' });
     const url = URL.createObjectURL(await res.blob());
-    Object.assign(document.createElement('a'), { href: url, download: `careloop-statement-${m}.csv` }).click();
+    Object.assign(document.createElement('a'), {
+      href: url,
+      download: `careloop-statement-${m}.csv`,
+    }).click();
     URL.revokeObjectURL(url);
   }
 
@@ -53,12 +67,17 @@ export function BillingCard() {
       <div className="space-y-3 text-sm">
         <p className="text-[var(--muted)]">
           Each site is charged per month; each follow-up is charged once, in the month after a
-          reviewer first approves it. Baseline and usual-care pilot cases are never charged. This is a
-          usage statement, not a GST tax invoice.
+          reviewer first approves it. Baseline and usual-care pilot cases are never charged. This is
+          a usage statement, not a GST tax invoice.
         </p>
         <div className="flex flex-wrap items-end gap-2">
           <Field label="Month">
-            <input type="month" className={inputClass} value={month} onChange={(e) => setMonth(e.target.value)} />
+            <input
+              type="month"
+              className={inputClass}
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+            />
           </Field>
           <Button onClick={issue} disabled={!month}>
             Issue statement
@@ -79,7 +98,8 @@ export function BillingCard() {
                   <span className="tabular-nums">{inr(s.totalInr)}</span>
                   <span className="text-[var(--muted)]">
                     {' '}
-                    · {s.lines.filter((l) => l.description.includes('site fee')).length} site(s) · {s.enrolledCases} follow-up(s)
+                    · {s.lines.filter((l) => l.description.includes('site fee')).length} site(s) ·{' '}
+                    {s.enrolledCases} follow-up(s)
                     {s.simulation ? ' · synthetic lab' : ''}
                   </span>
                 </div>

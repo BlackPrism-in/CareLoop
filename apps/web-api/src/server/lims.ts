@@ -37,7 +37,12 @@ export interface LimsInboxDoc {
   receivedAt: string;
 }
 
-export type LimsResult = { http: 200 | 201 | 202 | 400 | 401 | 404; status: string; caseId?: string | null; reason?: string };
+export type LimsResult = {
+  http: 200 | 201 | 202 | 400 | 401 | 404;
+  status: string;
+  caseId?: string | null;
+  reason?: string;
+};
 
 /**
  * Signed LIMS/hospital order intake. The tenant and site come from the
@@ -55,13 +60,16 @@ export async function ingestLimsOrder(req: {
 }): Promise<LimsResult> {
   const now = req.now ?? new Date();
   const secret = loadConfig().WEBHOOK_SIGNING_SECRETS[`lims:${req.account}`];
-  if (!secret || !/^[A-Za-z0-9_-]{1,64}$/.test(req.account)) return { http: 404, status: 'REJECTED', reason: 'UNKNOWN_ACCOUNT' };
+  if (!secret || !/^[A-Za-z0-9_-]{1,64}$/.test(req.account))
+    return { http: 404, status: 'REJECTED', reason: 'UNKNOWN_ACCOUNT' };
   const sig = verifySignedPayload(secret, req.signature, req.rawBody, now);
   if (sig !== 'OK') return { http: 401, status: 'REJECTED', reason: `SIGNATURE_${sig}` };
 
   const db = firestore();
-  const acct = (await db.doc(`provider_accounts/lims__${req.account}`).get()).data() as LimsAccount | undefined;
-  if (!acct?.tenantId || acct.active === false) return { http: 404, status: 'REJECTED', reason: 'UNKNOWN_ACCOUNT' };
+  const acct = (await db.doc(`provider_accounts/lims__${req.account}`).get()).data() as
+    LimsAccount | undefined;
+  if (!acct?.tenantId || acct.active === false)
+    return { http: 404, status: 'REJECTED', reason: 'UNKNOWN_ACCOUNT' };
 
   const hl7 = /hl7/i.test(req.contentType) || req.rawBody.trimStart().startsWith('MSH');
   let order: LimsOrder;
@@ -77,7 +85,12 @@ export async function ingestLimsOrder(req: {
       return { http: 400, status: 'REJECTED', reason: 'INVALID_JSON' };
     }
     const r = LimsOrder.safeParse(json);
-    if (!r.success) return { http: 400, status: 'REJECTED', reason: `INVALID_${String(r.error.issues[0]?.path[0] ?? 'ORDER').toUpperCase()}` };
+    if (!r.success)
+      return {
+        http: 400,
+        status: 'REJECTED',
+        reason: `INVALID_${String(r.error.issues[0]?.path[0] ?? 'ORDER').toUpperCase()}`,
+      };
     order = r.data;
   }
   const dueAt = limsDueAt(order.due);
@@ -89,7 +102,11 @@ export async function ingestLimsOrder(req: {
   const prior = (await inboxRef.get()).data() as LimsInboxDoc | undefined;
   if (prior?.status === 'CREATED') return { http: 200, status: 'DUPLICATE', caseId: prior.caseId };
 
-  const record = (status: LimsInboxDoc['status'], reason: string | null, caseId: string | null): LimsInboxDoc => ({
+  const record = (
+    status: LimsInboxDoc['status'],
+    reason: string | null,
+    caseId: string | null,
+  ): LimsInboxDoc => ({
     inboxId,
     account: req.account,
     orderId: order.orderId,
@@ -102,14 +119,30 @@ export async function ingestLimsOrder(req: {
     receivedAt: prior?.receivedAt ?? now.toISOString(),
   });
 
-  const p = await db.collection(tenantCollection(t, 'patients')).where('externalRef', '==', order.patientRef).limit(2).get();
+  const p = await db
+    .collection(tenantCollection(t, 'patients'))
+    .where('externalRef', '==', order.patientRef)
+    .limit(2)
+    .get();
   if (p.size !== 1) {
-    await inboxRef.set(record('NEEDS_REVIEW', p.size ? 'PATIENT_AMBIGUOUS' : 'PATIENT_NOT_FOUND', null));
-    return { http: 202, status: 'NEEDS_REVIEW', reason: p.size ? 'PATIENT_AMBIGUOUS' : 'PATIENT_NOT_FOUND' };
+    await inboxRef.set(
+      record('NEEDS_REVIEW', p.size ? 'PATIENT_AMBIGUOUS' : 'PATIENT_NOT_FOUND', null),
+    );
+    return {
+      http: 202,
+      status: 'NEEDS_REVIEW',
+      reason: p.size ? 'PATIENT_AMBIGUOUS' : 'PATIENT_NOT_FOUND',
+    };
   }
   const patient = p.docs[0]!.data() as Patient;
-  const consents = await db.collection(tenantCollection(t, 'consents')).where('patientId', '==', patient.patientId).limit(20).get();
-  const consent = consents.docs.map((d) => d.data() as Consent).find((k) => consentIsActive(k, now));
+  const consents = await db
+    .collection(tenantCollection(t, 'consents'))
+    .where('patientId', '==', patient.patientId)
+    .limit(20)
+    .get();
+  const consent = consents.docs
+    .map((d) => d.data() as Consent)
+    .find((k) => consentIsActive(k, now));
   if (!consent) {
     await inboxRef.set(record('NEEDS_REVIEW', 'NO_ACTIVE_CONSENT', null));
     return { http: 202, status: 'NEEDS_REVIEW', reason: 'NO_ACTIVE_CONSENT' };
@@ -122,7 +155,10 @@ export async function ingestLimsOrder(req: {
     roles: [],
     correlationId: randomUUID(),
   };
-  const sourceId = await queries().ensureSource(t, { sourceAuthority: order.orderingAuthority, reference: order.orderId });
+  const sourceId = await queries().ensureSource(t, {
+    sourceAuthority: order.orderingAuthority,
+    reference: order.orderId,
+  });
   try {
     const res = await caseCommands().createCase(ctx, {
       idempotencyKey: `lims:${req.account}:${order.orderId}`,

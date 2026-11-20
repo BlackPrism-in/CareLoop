@@ -14,9 +14,14 @@ export const POST = staffRoute<{ id: string }>(async ({ req, session, params }) 
   const { reason } = RevokeConsentBody.parse(await jsonBody(req));
   if (session.ctx.siteIds !== 'ALL' && session.ctx.siteIds !== undefined) {
     // Site-limited staff may only withdraw permission for patients they work with.
-    const cases = await firestore().collection(tenantCollection(session.ctx.tenantId, 'cases')).where('consentId', '==', params.id).limit(50).get();
+    const cases = await firestore()
+      .collection(tenantCollection(session.ctx.tenantId, 'cases'))
+      .where('consentId', '==', params.id)
+      .limit(50)
+      .get();
     const scope = session.ctx.siteIds;
-    if (!cases.docs.some((d) => scope.includes(d.data().siteId as string))) throw new HttpError('NOT_FOUND', 'Consent not found');
+    if (!cases.docs.some((d) => scope.includes(d.data().siteId as string)))
+      throw new HttpError('NOT_FOUND', 'Consent not found');
   }
   const r = await revokeConsent(firestore(), caseCommands(), session.ctx, {
     consentId: params.id,

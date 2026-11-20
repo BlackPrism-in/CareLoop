@@ -102,7 +102,11 @@ export function buildFhirBundle(input: FhirExportInput): Resource {
       {
         coding: [
           c.actionType === 'ORDERED_TEST'
-            ? { system: 'http://snomed.info/sct', code: '108252007', display: 'Laboratory procedure' }
+            ? {
+                system: 'http://snomed.info/sct',
+                code: '108252007',
+                display: 'Laboratory procedure',
+              }
             : { system: 'http://snomed.info/sct', code: '11429006', display: 'Consultation' },
         ],
       },
@@ -136,7 +140,9 @@ export function buildFhirBundle(input: FhirExportInput): Resource {
         resourceType: 'Appointment',
         id: fid(`appt-${b.bookingId}`),
         ...(b.simulation ? { meta: { tag: [{ system: `${SYS}/tags`, code: 'simulation' }] } } : {}),
-        ...(b.externalRef ? { identifier: [{ system: `${SYS}/${input.tenantId}/booking`, value: b.externalRef }] } : {}),
+        ...(b.externalRef
+          ? { identifier: [{ system: `${SYS}/${input.tenantId}/booking`, value: b.externalRef }] }
+          : {}),
         status,
         basedOn: [ref('ServiceRequest', requestId)],
         ...(b.startsAt ? { start: b.startsAt } : {}),
@@ -151,11 +157,20 @@ export function buildFhirBundle(input: FhirExportInput): Resource {
   const provenance: Resource = {
     resourceType: 'Provenance',
     id: fid(`prov-${c.caseId}-v${c.version}`),
-    target: [ref('Task', taskId), ref('ServiceRequest', requestId), ...appointments.map((a) => ref('Appointment', a.id))],
+    target: [
+      ref('Task', taskId),
+      ref('ServiceRequest', requestId),
+      ...appointments.map((a) => ref('Appointment', a.id)),
+    ],
     recorded: input.generatedAt,
     agent: agents.map((e) => ({
       type: {
-        coding: [{ system: 'http://terminology.hl7.org/CodeSystem/provenance-participant-type', code: e.actorType === 'STAFF' ? 'author' : 'assembler' }],
+        coding: [
+          {
+            system: 'http://terminology.hl7.org/CodeSystem/provenance-participant-type',
+            code: e.actorType === 'STAFF' ? 'author' : 'assembler',
+          },
+        ],
       },
       who: { display: `${e.actorType.toLowerCase()}:${e.actorId}` },
     })),
@@ -163,7 +178,10 @@ export function buildFhirBundle(input: FhirExportInput): Resource {
       {
         role: 'source',
         what: {
-          identifier: { system: `${SYS}/${input.tenantId}/event-chain`, value: c.lastEventHash ?? 'unchained' },
+          identifier: {
+            system: `${SYS}/${input.tenantId}/event-chain`,
+            value: c.lastEventHash ?? 'unchained',
+          },
           display: `Case event history v1–v${c.version}; chain ${chain.ok ? 'verified' : `FAILED (${chain.reason})`}`,
         },
       },
@@ -177,6 +195,9 @@ export function buildFhirBundle(input: FhirExportInput): Resource {
     type: 'collection',
     timestamp: input.generatedAt,
     // RESTful fullUrls, so the relative references inside resolve within the bundle.
-    entry: resources.map((r) => ({ fullUrl: `${SYS}/${input.tenantId}/${r.resourceType}/${r.id}`, resource: r })),
+    entry: resources.map((r) => ({
+      fullUrl: `${SYS}/${input.tenantId}/${r.resourceType}/${r.id}`,
+      resource: r,
+    })),
   };
 }

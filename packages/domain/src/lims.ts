@@ -56,18 +56,25 @@ export function parseHl7Orm(message: string): Hl7Result {
   const esc = encoding[2]!;
   const unescape = (v: string) =>
     v
-      .split(`${esc}F${esc}`).join(fieldSep)
-      .split(`${esc}S${esc}`).join(comp)
-      .split(`${esc}R${esc}`).join(rep)
-      .split(`${esc}T${esc}`).join(encoding[3] ?? '&')
-      .split(`${esc}E${esc}`).join(esc);
+      .split(`${esc}F${esc}`)
+      .join(fieldSep)
+      .split(`${esc}S${esc}`)
+      .join(comp)
+      .split(`${esc}R${esc}`)
+      .join(rep)
+      .split(`${esc}T${esc}`)
+      .join(encoding[3] ?? '&')
+      .split(`${esc}E${esc}`)
+      .join(esc);
   const seg = (name: string) => segments.filter((s) => s.startsWith(name + fieldSep));
   // MSH-1 is the separator itself, so MSH field n is at split index n-1.
-  const field = (s: string, n: number) => (s.startsWith('MSH') ? s.split(fieldSep)[n - 1] : s.split(fieldSep)[n]) ?? '';
+  const field = (s: string, n: number) =>
+    (s.startsWith('MSH') ? s.split(fieldSep)[n - 1] : s.split(fieldSep)[n]) ?? '';
   const comps = (v: string) => v.split(rep)[0]!.split(comp).map(unescape);
 
   const type = comps(field(msh, 9));
-  if (type[0] !== 'ORM' || (type[1] && type[1] !== 'O01')) return { ok: false, error: 'NOT_ORM_O01' };
+  if (type[0] !== 'ORM' || (type[1] && type[1] !== 'O01'))
+    return { ok: false, error: 'NOT_ORM_O01' };
   const messageId = unescape(field(msh, 10)) || undefined;
 
   const pid = seg('PID')[0];
@@ -80,17 +87,20 @@ export function parseHl7Orm(message: string): Hl7Result {
   if (obrs.length !== 1 || orcs.length > 1) return { ok: false, error: 'ONE_ORDER_PER_MESSAGE' };
   const orc = orcs[0];
   const obr = obrs[0]!;
-  if (orc && field(orc, 1) !== 'NW') return { ok: false, error: `ORDER_CONTROL_${field(orc, 1) || 'MISSING'}_NEEDS_STAFF` };
+  if (orc && field(orc, 1) !== 'NW')
+    return { ok: false, error: `ORDER_CONTROL_${field(orc, 1) || 'MISSING'}_NEEDS_STAFF` };
 
   const orderId = comps(orc ? field(orc, 2) : '')[0] || comps(field(obr, 2))[0] || '';
   const service = comps(field(obr, 4));
   const actionText = service[1] || service[0] || '';
   const provider = comps((orc && field(orc, 12)) || field(obr, 16));
   // XCN: id^family^given^...
-  const orderingAuthority = [provider[2], provider[1]].filter(Boolean).join(' ') || provider[0] || '';
+  const orderingAuthority =
+    [provider[2], provider[1]].filter(Boolean).join(' ') || provider[0] || '';
   // Timing: TQ1-7 (v2.5+), else OBR-27 component 4 (older TQ), else OBR-7 observation time.
   const tq1 = seg('TQ1')[0];
-  const due = (tq1 && comps(field(tq1, 7))[0]) || comps(field(obr, 27))[3] || comps(field(obr, 7))[0] || '';
+  const due =
+    (tq1 && comps(field(tq1, 7))[0]) || comps(field(obr, 27))[3] || comps(field(obr, 7))[0] || '';
   if (!due) return { ok: false, error: 'DUE_DATE_MISSING' };
   const dueAt = limsDueAt(due);
   if (!dueAt || Number.isNaN(dueAt.getTime())) return { ok: false, error: 'DUE_DATE_INVALID' };

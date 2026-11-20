@@ -64,7 +64,13 @@ export const POST = staffRoute(async ({ req, session }) => {
   }
   // A duplicate at a site the caller does not manage is reported without its case id.
   const visible = new Set(
-    (await filterBySite(t, [...existing.values()].map((caseId) => ({ caseId })), session.ctx.siteIds)).map((x) => x.caseId),
+    (
+      await filterBySite(
+        t,
+        [...existing.values()].map((caseId) => ({ caseId })),
+        session.ctx.siteIds,
+      )
+    ).map((x) => x.caseId),
   );
   const rows: CsvRowResult[] = preliminary.rows.map((r) => {
     if (!(r.status === 'OK' && r.input && existing.has(r.input.fingerprint))) return r;
@@ -74,7 +80,10 @@ export const POST = staffRoute(async ({ req, session }) => {
       ...r,
       status: 'DUPLICATE',
       existingCaseId: shown,
-      warnings: [...r.warnings, shown ? `Already a case: ${shown}` : 'Already a case at another site'],
+      warnings: [
+        ...r.warnings,
+        shown ? `Already a case: ${shown}` : 'Already a case at another site',
+      ],
     };
   });
   const previewHash = sha256(body.csv);

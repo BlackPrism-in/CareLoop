@@ -133,7 +133,10 @@ export const Case = z.strictObject({
   automationPausedReason: AutomationPausedReason.nullable(),
   fingerprint: z.string().min(1),
   /** Hash of the latest case event; each event commits to the one before it (tamper evidence). */
-  lastEventHash: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+  lastEventHash: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
   version: z.number().int().positive(),
   createdBy: id,
   createdAt: isoTime,

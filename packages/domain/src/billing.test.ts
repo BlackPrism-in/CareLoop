@@ -1,13 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { buildStatement, monthBounds, statementCsv } from './billing';
 
-const base = { workflowState: 'BOOKED' as const, approvedAt: '2026-11-02T00:00:00Z', pilotArm: null, createdAt: '2026-11-01T10:00:00Z' };
+const base = {
+  workflowState: 'BOOKED' as const,
+  approvedAt: '2026-11-02T00:00:00Z',
+  pilotArm: null,
+  createdAt: '2026-11-01T10:00:00Z',
+};
 const sites = [
   { siteId: 'north', displayName: 'North' },
   { siteId: 'south', displayName: 'South, Main' },
 ];
 const run = (cases: Parameters<typeof buildStatement>[0]['cases'], billed: string[] = []) =>
-  buildStatement({ tenantId: 't', month: '2026-11', sites, cases, alreadyBilled: new Set(billed), simulation: true, issuedAt: 'x', issuedBy: 'u' });
+  buildStatement({
+    tenantId: 't',
+    month: '2026-11',
+    sites,
+    cases,
+    alreadyBilled: new Set(billed),
+    simulation: true,
+    issuedAt: 'x',
+    issuedBy: 'u',
+  });
 
 describe('billing statement', () => {
   it('charges each site plus each newly enrolled case', () => {
@@ -20,7 +34,7 @@ describe('billing statement', () => {
     expect(s.caseIds).toEqual(['a', 'b', 'c']);
   });
 
-  it('never bills a case twice, nor drafts, pre-approval cancellations, comparison groups or next month\'s cases', () => {
+  it("never bills a case twice, nor drafts, pre-approval cancellations, comparison groups or next month's cases", () => {
     const s = run(
       [
         { ...base, caseId: 'old', siteId: 'north' },

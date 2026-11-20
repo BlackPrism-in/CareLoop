@@ -11,7 +11,11 @@ import type { CommandResult, Lookups } from '@/lib/types';
 import { useData } from '@/lib/use-data';
 
 /** Manual entry of an approved-action ticket (MVP-01). Creates a DRAFT; nothing is contacted. */
-const LANGUAGE_NAMES = { 'hi-IN': 'Hindi', 'en-IN': 'English (India)', 'bn-IN': 'Bengali' } as const;
+const LANGUAGE_NAMES = {
+  'hi-IN': 'Hindi',
+  'en-IN': 'English (India)',
+  'bn-IN': 'Bengali',
+} as const;
 
 export default function NewFollowUp() {
   const { me, hasRole } = useAuth();

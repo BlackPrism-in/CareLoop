@@ -20,9 +20,13 @@ export const GET = staffRoute(async ({ session }) => {
     .where('reviewStatus', 'in', ['PENDING', 'REVIEWED'])
     .limit(300)
     .get();
-  const items = (await filterBySite(session.ctx.tenantId, snap.docs
-    .map((d) => d.data()) as { caseId: string; [k: string]: unknown }[], session.ctx.siteIds))
-    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const items = (
+    await filterBySite(
+      session.ctx.tenantId,
+      snap.docs.map((d) => d.data()) as { caseId: string; [k: string]: unknown }[],
+      session.ctx.siteIds,
+    )
+  ).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   return Response.json({
     pending: items.filter((i) => i.reviewStatus === 'PENDING'),
     reviewed: items.filter((i) => i.reviewStatus === 'REVIEWED').slice(0, 50),

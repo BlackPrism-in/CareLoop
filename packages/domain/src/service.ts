@@ -156,23 +156,26 @@ export class CaseCommands {
     const { after, now } = args;
     const ts = now.toISOString();
     const eventId = `${after.caseId}-v${after.version}`;
-    const event: EventEnvelope = sealEvent({
-      schemaVersion: 1,
-      eventId,
-      eventType: args.transition.eventType,
-      tenantId: ctx.tenantId,
-      caseId: after.caseId,
-      correlationId: ctx.correlationId,
-      operationId: args.operationId,
-      actorType: ctx.actorType,
-      actorId: ctx.actorId,
-      occurredAt: ts,
-      receivedAt: ts,
-      ...(args.before ? { previousVersion: args.before.version } : {}),
-      nextVersion: after.version,
-      simulation: args.simulation,
-      payload: args.transition.payload,
-    }, args.before?.lastEventHash);
+    const event: EventEnvelope = sealEvent(
+      {
+        schemaVersion: 1,
+        eventId,
+        eventType: args.transition.eventType,
+        tenantId: ctx.tenantId,
+        caseId: after.caseId,
+        correlationId: ctx.correlationId,
+        operationId: args.operationId,
+        actorType: ctx.actorType,
+        actorId: ctx.actorId,
+        occurredAt: ts,
+        receivedAt: ts,
+        ...(args.before ? { previousVersion: args.before.version } : {}),
+        nextVersion: after.version,
+        simulation: args.simulation,
+        payload: args.transition.payload,
+      },
+      args.before?.lastEventHash,
+    );
     this.syncHandoff(tx, ctx, args.before, after, args.transition, now);
     tx.putCase({ ...after, lastEventHash: event.hash! });
     tx.appendEvent(event);
