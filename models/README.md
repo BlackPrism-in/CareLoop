@@ -1,12 +1,13 @@
 # Local intake model API
 
-This API runs only on `127.0.0.1` and is meant for local experiments with synthetic notes. It does not save requests or write to CareLoop case data.
+This Python API runs only on `127.0.0.1` and is meant for local experiments with synthetic notes. It does not save requests or write to CareLoop case data. The `IntakeModel` protocol in `intake_app.py` is the provider boundary; a LangChain adapter can implement that interface later without changing the API or validator.
 
 ## Start
 
-Set `GEMINI_API_KEY` and `FLASH_LITE_MODEL_ID` in `models/.env`, then from the repository root run:
+Install the Python dependencies once, then set `GEMINI_API_KEY` and `FLASH_LITE_MODEL_ID` in `models/.env`. From the repository root run:
 
 ```powershell
+python -m pip install -r models/requirements.txt
 corepack pnpm dev:models-api
 ```
 
@@ -33,6 +34,6 @@ The response contains the extracted text in `document.extractedText` and a valid
 
 The JSON `sourceText` request is still available for notes whose text has already been extracted. Model failures and unreadable documents return non-2xx responses with an error code and message.
 
-Run the rules and Gemini evaluator from the repository root with `corepack pnpm eval:models`. The full seed set has 22 cases. To rerun selected cases, set `EVAL_CASE_IDS` to comma-separated seed IDs, for example `EVAL_CASE_IDS=clean-001,hinglish-001`.
+Run the rules and Gemini evaluator from the repository root with `corepack pnpm eval:models`. The full seed set has 22 cases. To rerun selected cases, set `EVAL_CASE_IDS` to comma-separated seed IDs, for example `$env:EVAL_CASE_IDS='clean-001,hinglish-001'; corepack pnpm eval:models`.
 
 Because note text is sent to Gemini, use synthetic notes only in this local testing API. Do not expose this server to a network or send real patient information.

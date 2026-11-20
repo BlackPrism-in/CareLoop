@@ -114,28 +114,6 @@ importers:
         specifier: 4.23.15
         version: 4.23.15
 
-  models:
-    dependencies:
-      '@careloop/contracts':
-        specifier: workspace:*
-        version: link:../packages/contracts
-      '@fastify/busboy':
-        specifier: 3.2.6
-        version: 3.2.6
-      '@google/genai':
-        specifier: 3.6.1
-        version: 3.6.1
-      mammoth:
-        specifier: 1.13.0
-        version: 1.13.0
-      pdfjs-dist:
-        specifier: 6.5.438
-        version: 6.5.438
-    devDependencies:
-      tsx:
-        specifier: 4.23.15
-        version: 4.23.15
-
   packages/adapters:
     dependencies:
       '@careloop/contracts':

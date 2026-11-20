@@ -15,8 +15,8 @@
     "emulators": "firebase emulators:start --only firestore,auth",
     "seed": "pnpm --filter @careloop/scripts seed",
     "check:models": "corepack pnpm --filter @careloop/scripts check-models",
-    "eval:models": "corepack pnpm --filter @careloop/models eval:intake",
-    "dev:models-api": "corepack pnpm --filter @careloop/models api",
+    "eval:models": "python models/eval.py",
+    "dev:models-api": "python models/intake_app.py",
     "check": "pnpm format:check && pnpm typecheck && pnpm test",
     "test:emulator": "pnpm --filter @careloop/domain test:emulator"
   },
