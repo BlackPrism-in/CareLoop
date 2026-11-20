@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export const POST = staffRoute<{ id: string }>(async ({ req, session, params, correlationId }) => {
   const key = idempotencyKey(req);
   const body = PatientRequestBody.parse(await jsonBody(req));
-  const tenant = (await queries().lookups(session.ctx.tenantId)).tenant;
+  const tenant = (await queries().lookups(session.ctx.tenantId, session.ctx.siteIds)).tenant;
   if (!tenant) throw new HttpError('NOT_FOUND', 'Lab not found');
   if (!tenant.simulation)
     throw new HttpError('DOMAIN_GUARD_FAILED', 'IDENTITY_METHOD_NOT_CONFIGURED');

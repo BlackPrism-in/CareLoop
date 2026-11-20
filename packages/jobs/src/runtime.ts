@@ -55,6 +55,7 @@ export function createJobRuntime(cfg: AppConfig, db: Firestore, log: Logger): Jo
       outreachEnabled: cfg.OUTREACH_ENABLED,
       maxContactAttempts: cfg.MAX_CONTACT_ATTEMPTS,
       maxCaseAudioSeconds: cfg.MAX_CASE_AUDIO_SECONDS,
+      enabledLanguages: cfg.ENABLED_LANGUAGES,
     },
   });
   const booking = bookingAdapterFor(cfg, db);

@@ -1,5 +1,6 @@
 import { HttpError } from '@/server/errors';
 import { staffRoute } from '@/server/handler';
+import { filterBySite } from '@/server/case-helpers';
 import { jobQueries } from '@/server/services';
 
 export const dynamic = 'force-dynamic';
@@ -8,5 +9,5 @@ export const dynamic = 'force-dynamic';
 export const GET = staffRoute(async ({ session }) => {
   if (!session.ctx.roles.some((r) => ['OWNER', 'COORDINATOR', 'AUDITOR'].includes(r)))
     throw new HttpError('FORBIDDEN', 'Not permitted');
-  return Response.json({ items: await jobQueries().failedJobs(session.ctx.tenantId) });
+  return Response.json({ items: await filterBySite(session.ctx.tenantId, await jobQueries().failedJobs(session.ctx.tenantId), session.ctx.siteIds) });
 });

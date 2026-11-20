@@ -200,3 +200,13 @@ export const PilotConfigBody = z.strictObject({
     perEnrolledCaseInr: z.number().min(0),
   }),
 });
+
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+export const SiteBody = z.strictObject({
+  siteId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
+  displayName: z.string().trim().min(1).max(120),
+  timeZone: z.string().min(1).max(64),
+  contactWindow: z.strictObject({ start: hhmm, end: hhmm }),
+});
+export const MemberSitesBody = z.strictObject({ permittedSiteIds: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)).max(30) });
+export const StatementBody = z.strictObject({ month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) });

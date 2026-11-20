@@ -30,6 +30,7 @@ const modules = import.meta.glob('../app/**/route.ts', { eager: true }) as Recor
 >;
 const ids: Record<string, string> = {};
 let tokenB = '';
+let tokenNorth = '';
 
 const tenant = (tenantId: string, displayName: string): Tenant => ({
   tenantId,
@@ -86,6 +87,13 @@ beforeAll(async () => {
   }
   batch.set(db.doc(tenantRecord(A, 'members', 'a_owner')), member('a_owner'));
   batch.set(db.doc(tenantRecord(B, 'members', 'b_all')), member('b_all'));
+  // Same lab as A, but only allowed at a different site.
+  batch.set(db.doc(tenantRecord(A, 'sites', 'site_north')), { ...site, siteId: 'site_north', displayName: 'North' });
+  batch.set(db.doc(tenantRecord(A, 'members', 'a_north')), {
+    ...member('a_north'),
+    roleSet: ['REVIEWER', 'COORDINATOR', 'VERIFIER'],
+    permittedSiteIds: ['site_north'],
+  });
   const patient: Patient = {
     patientId: 'pat_a',
     externalRef: 'ext_ref_a_secret',
@@ -240,21 +248,21 @@ beforeAll(async () => {
   });
 
   const auth = getAuth(adminApp());
-  await auth.createUser({ uid: 'b_all', email: 'b_all@iso.careloop.test', password: PASSWORD });
-  await auth.setCustomUserClaims('b_all', { tenantId: B });
-  const res = await fetch(
-    `http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake`,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        email: 'b_all@iso.careloop.test',
-        password: PASSWORD,
-        returnSecureToken: true,
-      }),
-    },
-  );
-  tokenB = ((await res.json()) as { idToken: string }).idToken;
+  const signIn = async (uid: string, tenantId: string) => {
+    await auth.createUser({ uid, email: `${uid}@iso.careloop.test`, password: PASSWORD });
+    await auth.setCustomUserClaims(uid, { tenantId });
+    const res = await fetch(
+      `http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: `${uid}@iso.careloop.test`, password: PASSWORD, returnSecureToken: true }),
+      },
+    );
+    return ((await res.json()) as { idToken: string }).idToken;
+  };
+  tokenB = await signIn('b_all', B);
+  tokenNorth = await signIn('a_north', A);
 });
 
 afterAll(async () => {
@@ -328,6 +336,14 @@ function bodyFor(route: string): unknown {
       },
       pricing: { sitePerMonthInr: 2999, perEnrolledCaseInr: 25 },
     },
+    '/v1/sites': {
+      siteId: 'site_new',
+      displayName: 'New site',
+      timeZone: 'Asia/Kolkata',
+      contactWindow: { start: '09:00', end: '18:00' },
+    },
+    '/v1/members/[id]/sites': { permittedSiteIds: ['site_iso'] },
+    '/v1/billing/statements': { month: '2026-01' },
     '/v1/intake/csv': {
       csv: 'patient_ref,action_type,action_text,due_date,source_authority,reference\next_ref_a_secret,CONSULTATION,x,2030-01-01,clinic,ORD-A\n',
     },
@@ -348,6 +364,8 @@ function paramsFor(route: string): Record<string, string> {
   if (route.includes('/reviews/[id]')) p.id = 'int_a_secret';
   if (route.includes('/operations/[id]')) p.id = ids.operationId!;
   if (route.includes('/jobs/[id]')) p.id = ids.jobId!;
+  if (route.includes('/members/[id]')) p.id = 'a_owner';
+  if (route.includes('[month]')) p.month = '2026-01';
   if (route.includes('[action]')) p.action = 'acknowledge';
   return p;
 }
@@ -372,6 +390,10 @@ const OWN_TENANT_ROUTES = new Set([
   '/v1/reviews',
   '/v1/pilot/config',
   '/v1/pilot/report',
+  '/v1/sites',
+  '/v1/members',
+  '/v1/intake/lims',
+  '/v1/billing/statements',
 ]);
 /** Same path, different meaning per method: the GET lists the caller's own lab; the POST targets a case. */
 const OWN_TENANT_GETS = new Set(['/v1/time-logs']);
@@ -445,6 +467,39 @@ describe('tenant isolation sweep', () => {
           !(OWN_TENANT_ROUTES.has(route) || (method === 'GET' && OWN_TENANT_GETS.has(route))) &&
           ![403, 404].includes(res.status)
         )
+          findings.push(`${method} ${route} returned ${res.status} (expected 403/404)`);
+      }
+    }
+    expect(findings).toEqual([]);
+    expect(await snapshotA()).toEqual(before);
+  });
+
+  it('a member of the same lab limited to another site cannot read or change that site\'s case', async () => {
+    // Patients, consents and the lab name are lab-wide, so only case-specific values count as leaks.
+    const CASE_MARKERS = ['CL-ISO-A', 'secret action text', 'ev_iso_a', 'ext_bk_a', 'job_iso_a', 'int_a_secret'];
+    // Lists and lab-level actions may succeed; anything aimed at the case may not.
+    const MAY_SUCCEED = (method: string, route: string) =>
+      (method === 'GET' && (OWN_TENANT_ROUTES.has(route) || OWN_TENANT_GETS.has(route))) ||
+      ['/v1/intake', '/v1/intake/csv', '/v1/intake/pdf'].includes(route);
+    const before = await snapshotA();
+    const findings: string[] = [];
+    for (const { route, mod } of routes) {
+      for (const method of ['GET', 'POST', 'PATCH'] as const) {
+        const handler = mod[method] as ((r: Request, c: unknown) => Promise<Response>) | undefined;
+        if (!handler) continue;
+        const query = route === '/v1/reports' ? '?from=2020-01-01&to=2030-12-31' : '';
+        const res = await handler(
+          new Request(`http://localhost${route}${query}`, {
+            method,
+            headers: { authorization: `Bearer ${tokenNorth}`, 'idempotency-key': `north-${method}-${route}` },
+            body: method === 'GET' ? undefined : JSON.stringify(bodyFor(route)),
+          }),
+          { params: Promise.resolve(paramsFor(route)) },
+        );
+        const text = await res.text();
+        const leaked = CASE_MARKERS.filter((m) => text.includes(m));
+        if (leaked.length) findings.push(`${method} ${route} leaked ${leaked.join(', ')}`);
+        if (!MAY_SUCCEED(method, route) && ![403, 404].includes(res.status))
           findings.push(`${method} ${route} returned ${res.status} (expected 403/404)`);
       }
     }

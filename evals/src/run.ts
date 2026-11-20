@@ -37,7 +37,7 @@ async function main() {
       const t0 = Date.now();
       let failure: string | null = null;
       try {
-        await s.run(w, PHRASES[lang]);
+        await s.run(w, PHRASES[lang as keyof typeof PHRASES]);
       } catch (e) {
         failure = (e as Error).message.slice(0, 300);
       }

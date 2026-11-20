@@ -2,6 +2,7 @@ import type { Case, Member, Patient } from '@careloop/contracts';
 import { tenantCollection, tenantRecord, type HandoffDoc } from '@careloop/domain';
 import { firestore } from '@/server/firebase';
 import { staffRoute } from '@/server/handler';
+import { filterBySite } from '@/server/case-helpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,9 +19,9 @@ export const GET = staffRoute(async ({ req, session }) => {
     .where('status', 'in', status)
     .limit(100)
     .get();
-  const rows = snap.docs
+  const rows = await filterBySite(t, snap.docs
     .map((d) => d.data() as HandoffDoc)
-    .sort((a, b) => a.dueAt.localeCompare(b.dueAt));
+    .sort((a, b) => a.dueAt.localeCompare(b.dueAt)), session.ctx.siteIds);
   const cases = rows.length
     ? await db.getAll(
         ...[...new Set(rows.map((r) => r.caseId))].map((id) =>

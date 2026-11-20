@@ -1,5 +1,6 @@
 import type { Case } from '@careloop/contracts';
 import { tenantCollection, tenantRecord } from '@careloop/domain';
+import { loadCase } from '@/server/case-helpers';
 import { HttpError } from '@/server/errors';
 import { firestore } from '@/server/firebase';
 import { idempotencyKey, jsonBody, staffRoute } from '@/server/handler';
@@ -32,9 +33,7 @@ export const POST = staffRoute(async ({ req, session }) => {
   const t = session.ctx.tenantId;
   let arm: Case['pilotArm'] = null;
   if (body.caseId) {
-    const c = (await db.doc(tenantRecord(t, 'cases', body.caseId)).get()).data() as
-      Case | undefined;
-    if (!c) throw new HttpError('NOT_FOUND', 'Case not found');
+    const c = await loadCase(t, body.caseId, session.ctx.siteIds); // site scope
     arm = c.pilotArm;
   }
   const logId = `tl_${Buffer.from(`${session.ctx.actorId}:${key}`).toString('base64url').slice(0, 40)}`;

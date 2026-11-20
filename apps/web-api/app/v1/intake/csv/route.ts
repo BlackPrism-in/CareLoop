@@ -1,4 +1,4 @@
-import type { Consent, Member, Patient } from '@careloop/contracts';
+import { loadConfig, type Consent, type Member, type Patient } from '@careloop/contracts';
 import {
   consentIsActive,
   sha256,
@@ -7,6 +7,7 @@ import {
   validateCsv,
   type CsvRowResult,
 } from '@careloop/domain';
+import { filterBySite } from '@/server/case-helpers';
 import { HttpError } from '@/server/errors';
 import { firestore } from '@/server/firebase';
 import { jsonBody, staffRoute } from '@/server/handler';
@@ -48,6 +49,7 @@ export const POST = staffRoute(async ({ req, session }) => {
       patients.docs.map((d) => [(d.data() as Patient).externalRef, d.data() as Patient]),
     ),
     activeConsentByPatient,
+    enabledLanguages: loadConfig().ENABLED_LANGUAGES,
     existingCaseByFingerprint: new Map(),
   });
   // Existing-case check: look up only the fingerprints in this file.
@@ -60,16 +62,21 @@ export const POST = staffRoute(async ({ req, session }) => {
     for (const s of refs.length ? await db.getAll(...refs) : [])
       if (s.exists) existing.set(s.id, s.data()!.caseId as string);
   }
-  const rows: CsvRowResult[] = preliminary.rows.map((r) =>
-    r.status === 'OK' && r.input && existing.has(r.input.fingerprint)
-      ? {
-          ...r,
-          status: 'DUPLICATE',
-          existingCaseId: existing.get(r.input.fingerprint),
-          warnings: [...r.warnings, `Already a case: ${existing.get(r.input.fingerprint)}`],
-        }
-      : r,
+  // A duplicate at a site the caller does not manage is reported without its case id.
+  const visible = new Set(
+    (await filterBySite(t, [...existing.values()].map((caseId) => ({ caseId })), session.ctx.siteIds)).map((x) => x.caseId),
   );
+  const rows: CsvRowResult[] = preliminary.rows.map((r) => {
+    if (!(r.status === 'OK' && r.input && existing.has(r.input.fingerprint))) return r;
+    const id = existing.get(r.input.fingerprint)!;
+    const shown = visible.has(id) ? id : undefined;
+    return {
+      ...r,
+      status: 'DUPLICATE',
+      existingCaseId: shown,
+      warnings: [...r.warnings, shown ? `Already a case: ${shown}` : 'Already a case at another site'],
+    };
+  });
   const previewHash = sha256(body.csv);
   const summary = {
     ok: rows.filter((r) => r.status === 'OK').length,
@@ -98,7 +105,7 @@ export const POST = staffRoute(async ({ req, session }) => {
   if (preliminary.headerErrors.length || summary.errors > 0)
     throw new HttpError('DOMAIN_GUARD_FAILED', 'CSV_HAS_ERRORS');
 
-  const lab = await queries().lookups(t);
+  const lab = await queries().lookups(t, session.ctx.siteIds);
   const siteId = lab.sites[0]?.siteId;
   if (!siteId) throw new HttpError('DOMAIN_GUARD_FAILED', 'NO_SITE');
   const outcomes: {

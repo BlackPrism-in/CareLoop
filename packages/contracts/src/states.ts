@@ -59,7 +59,8 @@ export const ActionType = z.enum(['CONSULTATION', 'ORDERED_TEST']);
 export type ActionType = z.infer<typeof ActionType>;
 
 /** Languages enabled for patient contact. Bengali is gated on local-speaker evaluation. */
-export const SupportedLanguage = z.enum(['hi-IN', 'en-IN']);
+/** bn-IN is available only when ENABLED_LANGUAGES includes it (Phase 9). */
+export const SupportedLanguage = z.enum(['hi-IN', 'en-IN', 'bn-IN']);
 export type SupportedLanguage = z.infer<typeof SupportedLanguage>;
 
 export const ContactChannel = z.enum(['BROWSER_VOICE', 'PSTN_VOICE', 'WHATSAPP', 'SMS']);

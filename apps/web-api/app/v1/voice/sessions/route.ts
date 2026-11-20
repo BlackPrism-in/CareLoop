@@ -20,10 +20,10 @@ export const POST = staffRoute(async ({ req, session }) => {
     throw new HttpError('FORBIDDEN', 'Only coordinators can start calls');
   const { caseId } = VoiceSessionBody.parse(await jsonBody(req));
   const cfg = loadConfig();
-  const detail = await queries().caseDetail(session.ctx.tenantId, caseId);
+  const detail = await queries().caseDetail(session.ctx.tenantId, caseId, session.ctx.siteIds);
   if (!detail) throw new HttpError('NOT_FOUND', 'Case not found');
   const c = detail.case;
-  const tenant = (await queries().lookups(session.ctx.tenantId)).tenant;
+  const tenant = (await queries().lookups(session.ctx.tenantId, session.ctx.siteIds)).tenant;
   if (!tenant?.simulation && !cfg.OUTREACH_ENABLED)
     throw new HttpError('DOMAIN_GUARD_FAILED', 'OUTREACH_DISABLED');
   if (c.workflowState !== 'CONTACTING' && c.workflowState !== 'AWAITING_BOOKING')

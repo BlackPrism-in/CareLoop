@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { caseEvents, tenantCollection, tenantRecord } from '@careloop/domain';
+import type { EventEnvelope, Patient } from '@careloop/contracts';
+import { buildFhirBundle, caseEvents, tenantCollection, tenantRecord, verifyChain, type FhirBookingInput } from '@careloop/domain';
 import { loadCase } from '@/server/case-helpers';
 import { HttpError } from '@/server/errors';
 import { firestore } from '@/server/firebase';
@@ -12,11 +13,12 @@ export const dynamic = 'force-dynamic';
  * case, its event history, evidence, handoffs, bookings and call summaries.
  * No transcripts or audio exist to export.
  */
-export const GET = staffRoute<{ id: string }>(async ({ session, params }) => {
+export const GET = staffRoute<{ id: string }>(async ({ req, session, params }) => {
+  const format = new URL(req.url).searchParams.get('format') === 'fhir' ? 'fhir' : 'json';
   if (!session.ctx.roles.some((r) => r === 'OWNER' || r === 'AUDITOR'))
     throw new HttpError('FORBIDDEN', 'Only owners and auditors can export');
   const t = session.ctx.tenantId;
-  const c = await loadCase(t, params.id);
+  const c = await loadCase(t, params.id, session.ctx.siteIds);
   const db = firestore();
   const byCase = (col: Parameters<typeof tenantCollection>[1]) =>
     db.collection(tenantCollection(t, col)).where('caseId', '==', c.caseId).get();
@@ -32,17 +34,37 @@ export const GET = staffRoute<{ id: string }>(async ({ session, params }) => {
   await db.doc(tenantRecord(t, 'audit', auditId)).set({
     auditId,
     action: 'CASE_EXPORTED',
+    format,
     caseId: c.caseId,
     actorId: session.ctx.actorId,
     at,
     correlationId: session.ctx.correlationId,
   });
+  if (format === 'fhir') {
+    const patient = (await db.doc(tenantRecord(t, 'patients', c.patientId)).get()).data() as Patient | undefined;
+    const bundle = buildFhirBundle({
+      tenantId: t,
+      case: c,
+      patientExternalRef: patient?.externalRef ?? null,
+      events: events.docs.map((d) => d.data() as EventEnvelope),
+      bookings: bookings.docs.map((d) => d.data() as FhirBookingInput),
+      generatedAt: at,
+    });
+    return new Response(JSON.stringify(bundle, null, 2), {
+      headers: {
+        'content-type': 'application/fhir+json',
+        'content-disposition': `attachment; filename="${c.caseId}-fhir.json"`,
+      },
+    });
+  }
   const body = {
     exportedAt: at,
     exportedBy: session.ctx.actorId,
     auditId,
     case: c,
     events: events.docs.map((d) => d.data()),
+    // Tamper evidence: whether the event history still matches its hash chain and the case head.
+    integrity: { ...verifyChain(events.docs.map((d) => d.data() as EventEnvelope), c.lastEventHash), headHash: c.lastEventHash ?? null },
     evidence: evidence.docs.map((d) => d.data()),
     handoffs: handoffs.docs.map((d) => d.data()),
     bookings: bookings.docs.map((d) => d.data()),

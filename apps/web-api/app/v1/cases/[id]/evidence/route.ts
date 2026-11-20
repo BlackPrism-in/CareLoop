@@ -11,7 +11,7 @@ import { caseCommands, kick, queries } from '@/server/services';
 export const dynamic = 'force-dynamic';
 
 export const GET = staffRoute<{ id: string }>(async ({ session, params }) => {
-  await loadCase(session.ctx.tenantId, params.id);
+  await loadCase(session.ctx.tenantId, params.id, session.ctx.siteIds);
   const snap = await firestore()
     .collection(tenantCollection(session.ctx.tenantId, 'evidence'))
     .where('caseId', '==', params.id)
@@ -29,8 +29,8 @@ export const GET = staffRoute<{ id: string }>(async ({ session, params }) => {
 export const POST = staffRoute<{ id: string }>(async ({ req, session, params }) => {
   const key = idempotencyKey(req);
   const body = RecordEvidenceBody.parse(await jsonBody(req));
-  const c = await loadCase(session.ctx.tenantId, params.id);
-  const tenant = (await queries().lookups(session.ctx.tenantId)).tenant;
+  const c = await loadCase(session.ctx.tenantId, params.id, session.ctx.siteIds);
+  const tenant = (await queries().lookups(session.ctx.tenantId, session.ctx.siteIds)).tenant;
   let aiReview: Record<string, unknown> | null = null;
   if (body.kind === 'STAFF_RECORD' && body.excerpt) {
     // Optional verification agent: a recommendation shown to the verifier, never a decision.

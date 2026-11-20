@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SupportedLanguage } from './states';
 
 const bool = z
   .enum(['true', 'false'])
@@ -32,6 +33,12 @@ export const AppConfig = z.object({
   MESSAGING_ADAPTER: z.enum(['simulated', 'provider']).default('simulated'),
   /** Master kill switch for automated patient contact. Must stay false outside a reviewed pilot. */
   OUTREACH_ENABLED: bool,
+  /** Languages staff may create cases in and CareLoop may contact patients in. */
+  ENABLED_LANGUAGES: z
+    .string()
+    .default('hi-IN,en-IN')
+    .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean))
+    .pipe(z.array(SupportedLanguage).min(1)),
   /** Staff must sign in with a second factor (TOTP). Required in the pilot. */
   REQUIRE_STAFF_MFA: bool,
   MAX_CONTACT_ATTEMPTS: z.coerce.number().int().min(0).max(5).default(2),

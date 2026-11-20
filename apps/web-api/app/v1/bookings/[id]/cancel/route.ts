@@ -1,3 +1,4 @@
+import { loadCase } from '@/server/case-helpers';
 import { HttpError } from '@/server/errors';
 import { idempotencyKey, jsonBody, staffRoute } from '@/server/handler';
 import { CancelBookingBody } from '@/server/schemas';
@@ -11,6 +12,9 @@ export const POST = staffRoute<{ id: string }>(async ({ req, session, params }) 
   const body = CancelBookingBody.parse(await jsonBody(req));
   const b = await jobQueries().booking(session.ctx.tenantId, params.id);
   if (!b) throw new HttpError('NOT_FOUND', 'Booking not found');
+  await loadCase(session.ctx.tenantId, b.caseId, session.ctx.siteIds).catch(() => {
+    throw new HttpError('NOT_FOUND', 'Booking not found');
+  });
   if (b.status !== 'CONFIRMED' || !b.externalRef)
     throw new HttpError('DOMAIN_GUARD_FAILED', 'NO_CONFIRMED_BOOKING');
   const result = await caseCommands().requestBookingCancellation(session.ctx, {

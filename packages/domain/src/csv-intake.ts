@@ -91,6 +91,8 @@ export interface CsvContext {
   activeOwnerIds: Set<string>;
   patientsByRef: Map<string, Patient>;
   activeConsentByPatient: Map<string, Consent>;
+  /** Defaults to Hindi and English. */
+  enabledLanguages?: readonly SupportedLanguage[];
   existingCaseByFingerprint: Map<string, string>;
 }
 
@@ -144,7 +146,8 @@ export function validateCsv(
     const ownerId = get('owner_id') || ctx.defaultOwnerId;
     if (!ctx.activeOwnerIds.has(ownerId)) errors.push('owner_id is not an active staff member');
     const lang = (get('language') || patient?.language || '') as SupportedLanguage;
-    if (lang !== 'hi-IN' && lang !== 'en-IN') errors.push('language must be hi-IN or en-IN');
+    if (!(ctx.enabledLanguages ?? ['hi-IN', 'en-IN']).includes(lang))
+      errors.push(`language must be one of ${(ctx.enabledLanguages ?? ['hi-IN', 'en-IN']).join(', ')}`);
     const consent = patient ? ctx.activeConsentByPatient.get(patient.patientId) : undefined;
     if (patient && !consent) errors.push('No active contact permission for this patient');
     if (patient && patient.ageEligibility !== 'ADULT_CONFIRMED')

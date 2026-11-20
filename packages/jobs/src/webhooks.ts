@@ -27,7 +27,8 @@ export function signSandboxPayload(secret: string, timestamp: number, rawBody: s
   return `t=${timestamp},v1=${createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex')}`;
 }
 
-function verify(
+/** Checks a "t=<unix>,v1=<hex hmac>" signature over the raw body within the replay window. */
+export function verifySignedPayload(
   secret: string,
   header: string | null,
   rawBody: string,
@@ -74,7 +75,7 @@ export async function ingestProviderWebhook(
   if (req.provider !== 'sandbox' || !secret || !/^[A-Za-z0-9_-]{1,64}$/.test(req.account)) {
     return { httpStatus: 404, status: 'REJECTED', reason: 'UNKNOWN_ACCOUNT' };
   }
-  const sig = verify(secret, req.signature, req.rawBody, now);
+  const sig = verifySignedPayload(secret, req.signature, req.rawBody, now);
   if (sig !== 'OK') {
     deps.log.warn('webhook signature rejected', {
       provider: req.provider,

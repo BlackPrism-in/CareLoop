@@ -18,7 +18,12 @@ import { caseEvents, tenantCollection, tenantDoc, tenantRecord } from './paths';
  * Lists use cursor pagination ordered by (dueAt, caseId) — no tenant scans.
  */
 
+/** Site scope from the actor context: 'ALL'/undefined = every site. */
+export type SiteScope = readonly string[] | 'ALL' | undefined;
+const inScope = (scope: SiteScope, siteId: string) => scope === undefined || scope === 'ALL' || scope.includes(siteId);
+
 export interface CaseListFilter {
+  siteIds?: SiteScope;
   workflowState?: WorkflowState;
   ownerId?: string;
   handoffPending?: boolean;
@@ -96,6 +101,10 @@ export class CaseQueries {
   ): Promise<{ items: CaseListItem[]; nextCursor: string | null }> {
     const limit = Math.min(Math.max(f.limit ?? 25, 1), 100);
     let q: Query = this.cases(tenantId);
+    if (f.siteIds !== undefined && f.siteIds !== 'ALL') {
+      if (f.siteIds.length === 0) return { items: [], nextCursor: null };
+      q = q.where('siteId', 'in', f.siteIds.slice(0, 30));
+    }
     if (f.workflowState) q = q.where('workflowState', '==', f.workflowState);
     if (f.ownerId) q = q.where('ownerId', '==', f.ownerId);
     if (f.handoffPending) q = q.where('handoffState', '==', 'PENDING');
@@ -128,8 +137,9 @@ export class CaseQueries {
   }
 
   /** Counts for the overview tiles. Uses aggregation queries, not document reads. */
-  async overview(tenantId: string, uid: string) {
-    const c = this.cases(tenantId);
+  async overview(tenantId: string, uid: string, scope?: SiteScope) {
+    let c: Query = this.cases(tenantId);
+    if (scope !== undefined && scope !== 'ALL') c = c.where('siteId', 'in', scope.length ? scope.slice(0, 30) : ['__none__']);
     const count = async (q: Query) => (await q.count().get()).data().count;
     const [needApproval, handoffsPending, booked, proofToReview, mine] = await Promise.all([
       count(c.where('workflowState', '==', 'DRAFT')),
@@ -141,10 +151,12 @@ export class CaseQueries {
     return { needApproval, handoffsPending, booked, proofToReview, mine };
   }
 
-  async caseDetail(tenantId: string, caseId: string) {
+  async caseDetail(tenantId: string, caseId: string, scope?: SiteScope) {
     const snap = await this.db.doc(tenantRecord(tenantId, 'cases', caseId)).get();
     if (!snap.exists) return null;
     const c = snap.data() as Case;
+    // A case at a site outside the caller's scope is indistinguishable from a missing one.
+    if (!inScope(scope, c.siteId)) return null;
     const [patient, consent, source, owner, site, eventsSnap] = await Promise.all([
       this.db.doc(tenantRecord(tenantId, 'patients', c.patientId)).get(),
       this.db.doc(tenantRecord(tenantId, 'consents', c.consentId)).get(),
@@ -206,7 +218,7 @@ export class CaseQueries {
   }
 
   /** Pickers for the New follow-up form. Demo scale: bounded lists, aliases only. */
-  async lookups(tenantId: string) {
+  async lookups(tenantId: string, scope?: SiteScope) {
     const [tenant, sites, members, patients, consents] = await Promise.all([
       this.db.doc(tenantDoc(tenantId)).get(),
       this.db.collection(tenantCollection(tenantId, 'sites')).limit(50).get(),
@@ -223,7 +235,7 @@ export class CaseQueries {
       tenant: t
         ? { tenantId, displayName: t.displayName as string, simulation: t.simulation as boolean }
         : null,
-      sites: sites.docs.map((d) => ({ siteId: d.id, displayName: (d.data() as Site).displayName })),
+      sites: sites.docs.filter((d) => inScope(scope, d.id)).map((d) => ({ siteId: d.id, displayName: (d.data() as Site).displayName })),
       members: members.docs.map((d) => {
         const m = d.data() as Member;
         return { uid: m.uid, displayName: m.displayName, roleSet: m.roleSet };

@@ -23,7 +23,7 @@ Allowed fields:
 - dueDate: the deadline as YYYY-MM-DD
 - sourceAuthority: who approved it (clinic, doctor or pathologist name as written)
 - reference: the order or instruction number
-- language: "hi-IN" or "en-IN" only if a preferred patient language is stated`,
+- language: "hi-IN", "en-IN" or "bn-IN" only if a preferred patient language is stated`,
 };
 
 export const COORDINATION_PROMPT = {
@@ -52,16 +52,17 @@ export interface ConversationContext {
   labName: string;
   actionLabel: string;
   dueDateLocal: string;
-  language: 'hi-IN' | 'en-IN';
+  language: 'hi-IN' | 'en-IN' | 'bn-IN';
   simulation: boolean;
 }
 
 /** Minimum approved logistics only: no patient name, no report content, no history. */
 export function conversationSystemPrompt(ctx: ConversationContext): string {
-  const lang =
-    ctx.language === 'hi-IN'
-      ? 'Hindi (switch to English if the patient does)'
-      : 'Indian English (switch to Hindi if the patient does)';
+  const lang = {
+    'hi-IN': 'Hindi (switch to English if the patient does)',
+    'en-IN': 'Indian English (switch to Hindi if the patient does)',
+    'bn-IN': 'Bengali as spoken in India (switch to Hindi or English if the patient does)',
+  }[ctx.language];
   return `${SCOPE_RULES}
 You are an AI assistant calling on behalf of ${ctx.labName}. Speak ${lang}. Be brief, warm and plain.
 ${ctx.simulation ? 'This is a SIMULATED demo call with a synthetic patient.\n' : ''}

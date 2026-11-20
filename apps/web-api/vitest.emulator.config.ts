@@ -19,7 +19,7 @@ export default defineConfig({
       COORDINATION_MODEL_ID: 'test-coord',
       VERIFICATION_MODEL_ID: 'test-verify',
       LIVE_MODEL_ID: 'test-live',
-      WEBHOOK_SIGNING_SECRETS: '{"sandbox:demo-calendar":"api-test-webhook-secret-01"}',
+      WEBHOOK_SIGNING_SECRETS: '{"sandbox:demo-calendar":"api-test-webhook-secret-01","lims:hosp1":"lims-test-secret-01"}',
     },
   },
 });

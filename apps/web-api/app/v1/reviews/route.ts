@@ -2,6 +2,7 @@ import { tenantCollection } from '@careloop/domain';
 import { HttpError } from '@/server/errors';
 import { firestore } from '@/server/firebase';
 import { staffRoute } from '@/server/handler';
+import { filterBySite } from '@/server/case-helpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,8 +20,8 @@ export const GET = staffRoute(async ({ session }) => {
     .where('reviewStatus', 'in', ['PENDING', 'REVIEWED'])
     .limit(300)
     .get();
-  const items = snap.docs
-    .map((d) => d.data())
+  const items = (await filterBySite(session.ctx.tenantId, snap.docs
+    .map((d) => d.data()) as { caseId: string; [k: string]: unknown }[], session.ctx.siteIds))
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   return Response.json({
     pending: items.filter((i) => i.reviewStatus === 'PENDING'),

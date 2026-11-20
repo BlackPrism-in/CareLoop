@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export const POST = staffRoute<{ id: string }>(async ({ req, session, params }) => {
   const key = idempotencyKey(req);
   const body = BookingRequestBody.parse(await jsonBody(req));
-  const detail = await queries().caseDetail(session.ctx.tenantId, params.id);
+  const detail = await queries().caseDetail(session.ctx.tenantId, params.id, session.ctx.siteIds);
   if (!detail) throw new HttpError('NOT_FOUND', 'Case not found');
   const booking = jobRuntime().booking;
   if (booking.kind === 'manual') {

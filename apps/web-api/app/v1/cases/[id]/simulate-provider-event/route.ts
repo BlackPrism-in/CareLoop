@@ -22,10 +22,10 @@ export const POST = staffRoute<{ id: string }>(async ({ req, session, params }) 
   if (!session.ctx.roles.some((r) => r === 'COORDINATOR' || r === 'VERIFIER'))
     throw new HttpError('FORBIDDEN', 'Not permitted');
   const { scenario } = SimulateEventBody.parse(await jsonBody(req));
-  const tenant = (await queries().lookups(session.ctx.tenantId)).tenant;
+  const tenant = (await queries().lookups(session.ctx.tenantId, session.ctx.siteIds)).tenant;
   if (!tenant?.simulation)
     throw new HttpError('FORBIDDEN', 'Simulation is only available in synthetic labs');
-  const c = await loadCase(session.ctx.tenantId, params.id);
+  const c = await loadCase(session.ctx.tenantId, params.id, session.ctx.siteIds);
   const p = (
     await firestore()
       .doc(tenantRecord(session.ctx.tenantId, 'patients', c.patientId))

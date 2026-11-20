@@ -25,6 +25,10 @@ export const EventEnvelope = z.object({
   /** True for anything produced by a sandbox/simulated adapter. Must be shown in the UI. */
   simulation: z.boolean(),
   payload: z.record(z.string(), z.unknown()),
+  /** Hash of the previous event in this case (64 zeros for the first). */
+  prevHash: z.string().optional(),
+  /** sha256 of this event's canonical JSON without `hash`. */
+  hash: z.string().optional(),
 });
 export type EventEnvelope = z.infer<typeof EventEnvelope>;
 

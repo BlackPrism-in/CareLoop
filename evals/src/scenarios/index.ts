@@ -34,7 +34,7 @@ export interface Phrases {
   stop: string;
 }
 
-export const PHRASES: Record<SupportedLanguage, Phrases> = {
+export const PHRASES: Record<Exclude<SupportedLanguage, 'bn-IN'>, Phrases> = {
   'hi-IN': {
     afterWork: 'शाम को ही आ पाऊँगा, दिन में काम होता है',
     morning: 'subah aa sakta hoon',

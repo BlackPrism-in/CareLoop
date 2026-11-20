@@ -161,7 +161,7 @@ export function computePilotReport(i: PilotReportInput) {
   );
   const feasNum = feasDenom.filter(verifiedContact);
   const byLanguage = Object.fromEntries(
-    (['hi-IN', 'en-IN'] as const).map((lang) => {
+    (['hi-IN', 'en-IN', 'bn-IN'] as const).map((lang) => {
       const d = feasDenom.filter((c) => c.language === lang);
       return [lang, wilson(d.filter(verifiedContact).length, d.length)];
     }),

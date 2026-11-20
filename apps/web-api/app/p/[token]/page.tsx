@@ -12,29 +12,44 @@ interface View {
   labWillCall: boolean;
   automatedContact: boolean;
   simulation: boolean;
+  language?: 'hi-IN' | 'en-IN' | 'bn-IN';
 }
 
+// [English, Hindi, Bengali]. Each line shows English plus the patient's language.
 const T = {
-  title: ['Your follow-up', 'आपका फ़ॉलो-अप'],
-  code: ['Enter the 6-digit code the lab sent you', 'लैब द्वारा भेजा गया 6 अंकों का कोड डालें'],
-  go: ['Continue', 'आगे बढ़ें'],
-  consult: ['Clinic consultation', 'क्लिनिक में परामर्श'],
-  test: ['A test your doctor has already ordered', 'डॉक्टर द्वारा पहले से बताया गया टेस्ट'],
-  change: ['Ask for a different time', 'दूसरा समय माँगें'],
-  call: ['Ask the lab to call me', 'लैब मुझे कॉल करे'],
-  stop: ['Stop automated calls and messages', 'स्वचालित कॉल और संदेश बंद करें'],
+  title: ['Your follow-up', 'आपका फ़ॉलो-अप', 'আপনার ফলো-আপ'],
+  code: [
+    'Enter the 6-digit code the lab sent you',
+    'लैब द्वारा भेजा गया 6 अंकों का कोड डालें',
+    'ল্যাব থেকে পাঠানো ৬ সংখ্যার কোডটি লিখুন',
+  ],
+  go: ['Continue', 'आगे बढ़ें', 'এগিয়ে যান'],
+  consult: ['Clinic consultation', 'क्लिनिक में परामर्श', 'ক্লিনিকে পরামর্শ'],
+  test: [
+    'A test your doctor has already ordered',
+    'डॉक्टर द्वारा पहले से बताया गया टेस्ट',
+    'আপনার ডাক্তার আগেই যে পরীক্ষা লিখে দিয়েছেন',
+  ],
+  change: ['Ask for a different time', 'दूसरा समय माँगें', 'অন্য সময় চান'],
+  call: ['Ask the lab to call me', 'लैब मुझे कॉल करे', 'ল্যাব আমাকে ফোন করুক'],
+  stop: [
+    'Stop automated calls and messages',
+    'स्वचालित कॉल और संदेश बंद करें',
+    'স্বয়ংক্রিয় কল ও বার্তা বন্ধ করুন',
+  ],
   noMedical: [
     'This page has no medical details. For medical questions, please speak to your doctor or the lab.',
     'इस पेज पर कोई मेडिकल जानकारी नहीं है। मेडिकल सवालों के लिए अपने डॉक्टर या लैब से बात करें।',
+    'এই পাতায় কোনো চিকিৎসা-সংক্রান্ত তথ্য নেই। চিকিৎসা নিয়ে প্রশ্ন থাকলে আপনার ডাক্তার বা ল্যাবের সঙ্গে কথা বলুন।',
   ],
 } as const;
 
-function L({ t }: { t: readonly [string, string] }) {
+function L({ t, s }: { t: readonly [string, string, string]; s: 'hi' | 'bn' }) {
   return (
     <>
       {t[0]}
-      <span className="block text-sm font-normal opacity-75" lang="hi">
-        {t[1]}
+      <span className="block text-sm font-normal opacity-75" lang={s}>
+        {s === 'bn' ? t[2] : t[1]}
       </span>
     </>
   );
@@ -53,6 +68,7 @@ export default function PatientPage({ params }: { params: Promise<{ token: strin
   const [msg, setMsg] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
+  const second = view?.language === 'bn-IN' ? 'bn' : 'hi';
 
   async function load() {
     const r = await fetch('/v1/p/me', { cache: 'no-store' });
@@ -123,14 +139,14 @@ export default function PatientPage({ params }: { params: Promise<{ token: strin
   return (
     <main className="mx-auto max-w-md space-y-5 px-4 py-8 text-base">
       <h1 className="text-xl font-semibold">
-        <L t={T.title} />
+        <L s={second} t={T.title} />
       </h1>
       {phase === 'loading' && <p className="text-[var(--muted)]">…</p>}
 
       {phase === 'code' && (
         <form onSubmit={submitCode} className="space-y-3">
           <label className="block font-medium" htmlFor="code">
-            <L t={T.code} />
+            <L s={second} t={T.code} />
           </label>
           <input
             id="code"
@@ -147,7 +163,7 @@ export default function PatientPage({ params }: { params: Promise<{ token: strin
             disabled={busy || code.length !== 6}
             className={`${big} bg-[var(--accent)] text-center text-[var(--on-accent)] hover:bg-[var(--accent-strong)]`}
           >
-            <L t={T.go} />
+            <L s={second} t={T.go} />
           </button>
         </form>
       )}
@@ -162,7 +178,7 @@ export default function PatientPage({ params }: { params: Promise<{ token: strin
           <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
             <p className="text-sm text-[var(--muted)]">{view.labName}</p>
             <p className="mt-1 text-lg font-semibold">
-              <L t={view.followUp === 'ORDERED_TEST' ? T.test : T.consult} />
+              <L s={second} t={view.followUp === 'ORDERED_TEST' ? T.test : T.consult} />
             </p>
             <div className="mt-3">
               {view.status === 'BOOKED' && view.appointment && (
@@ -190,15 +206,15 @@ export default function PatientPage({ params }: { params: Promise<{ token: strin
           {['NOT_BOOKED', 'REQUEST_RECEIVED', 'BOOKED'].includes(view.status) && (
             <div className="space-y-3">
               <button className={big} disabled={busy} onClick={() => act('REQUEST_CHANGE')}>
-                <L t={T.change} />
+                <L s={second} t={T.change} />
               </button>
               <button className={big} disabled={busy} onClick={() => act('REQUEST_CALLBACK')}>
-                <L t={T.call} />
+                <L s={second} t={T.call} />
               </button>
               {view.automatedContact &&
                 (!confirmStop ? (
                   <button className={big} disabled={busy} onClick={() => setConfirmStop(true)}>
-                    <L t={T.stop} />
+                    <L s={second} t={T.stop} />
                   </button>
                 ) : (
                   <div className="space-y-2 rounded-lg border border-[var(--warn-line)] bg-[var(--warn-bg)] p-3">
@@ -235,7 +251,7 @@ export default function PatientPage({ params }: { params: Promise<{ token: strin
         </p>
       )}
       <p className="text-sm text-[var(--muted)]">
-        <L t={T.noMedical} />
+        <L s={second} t={T.noMedical} />
       </p>
     </main>
   );

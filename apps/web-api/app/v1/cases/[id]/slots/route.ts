@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 /** Available slots come only from the booking adapter (MVP spec §17), from now until the due date. */
 export const GET = staffRoute<{ id: string }>(async ({ session, params }) => {
-  const detail = await queries().caseDetail(session.ctx.tenantId, params.id);
+  const detail = await queries().caseDetail(session.ctx.tenantId, params.id, session.ctx.siteIds);
   if (!detail) throw new HttpError('NOT_FOUND', 'Case not found');
   const c = detail.case;
   const booking = jobRuntime().booking;

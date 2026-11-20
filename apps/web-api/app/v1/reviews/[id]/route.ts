@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { tenantRecord } from '@careloop/domain';
+import { loadCase } from '@/server/case-helpers';
 import { HttpError } from '@/server/errors';
 import { firestore } from '@/server/firebase';
 import { jsonBody, staffRoute } from '@/server/handler';
@@ -17,6 +18,9 @@ export const POST = staffRoute<{ id: string }>(async ({ req, session, params }) 
     throw new HttpError('VALIDATION_FAILED', 'Choose at least one issue', { issues: 'required' });
   const db = firestore();
   const ref = db.doc(tenantRecord(session.ctx.tenantId, 'interactions', params.id));
+  const call = (await ref.get()).data();
+  if (!call) throw new HttpError('NOT_FOUND', 'Call not found');
+  await loadCase(session.ctx.tenantId, String(call.caseId), session.ctx.siteIds); // site scope
   const now = new Date().toISOString();
   const auditId = randomUUID();
   await db.runTransaction(async (t) => {

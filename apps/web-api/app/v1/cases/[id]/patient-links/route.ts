@@ -16,13 +16,13 @@ export const dynamic = 'force-dynamic';
 export const POST = staffRoute<{ id: string }>(async ({ session, params }) => {
   if (!session.ctx.roles.includes('COORDINATOR'))
     throw new HttpError('FORBIDDEN', 'Only coordinators can create patient links');
-  const c = await loadCase(session.ctx.tenantId, params.id);
+  const c = await loadCase(session.ctx.tenantId, params.id, session.ctx.siteIds);
   if (['DRAFT', 'CANCELLED', 'COMPLETED_VERIFIED'].includes(c.workflowState))
     throw new HttpError('DOMAIN_GUARD_FAILED', 'CASE_NOT_OPEN_FOR_PATIENT');
   // Patient links are CareLoop outreach: baseline and usual-care cases follow the lab's normal process.
   if (!automatedContactAllowed(c.pilotArm))
     throw new HttpError('DOMAIN_GUARD_FAILED', 'NOT_IN_INTERVENTION_ARM');
-  const tenant = (await queries().lookups(session.ctx.tenantId)).tenant;
+  const tenant = (await queries().lookups(session.ctx.tenantId, session.ctx.siteIds)).tenant;
   const { token, code, expiresAt } = await createPatientLink(firestore(), {
     tenantId: session.ctx.tenantId,
     caseId: c.caseId,

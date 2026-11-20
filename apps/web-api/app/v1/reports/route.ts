@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Case } from '@careloop/contracts';
-import { tenantCollection, type EvidenceDoc, type HandoffDoc } from '@careloop/domain';
+import { canAccessSite, tenantCollection, type EvidenceDoc, type HandoffDoc } from '@careloop/domain';
 import { firestore } from '@/server/firebase';
 import { staffRoute } from '@/server/handler';
 
@@ -10,6 +10,7 @@ const Query = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   cohort: z.enum(['due', 'created']).default('due'),
+  site: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),
 });
 
 const MAX_CASES = 2000;
@@ -33,7 +34,7 @@ export const GET = staffRoute(async ({ req, session }) => {
     .where(field, '<=', toIso)
     .limit(MAX_CASES + 1)
     .get();
-  const cases = snap.docs.slice(0, MAX_CASES).map((d) => d.data() as Case);
+  const cases = snap.docs.slice(0, MAX_CASES).map((d) => d.data() as Case).filter((c) => canAccessSite(session.ctx, c.siteId) && (!q.site || c.siteId === q.site));
   const ids = new Set(cases.map((c) => c.caseId));
 
   const [evidence, handoffs] = await Promise.all([

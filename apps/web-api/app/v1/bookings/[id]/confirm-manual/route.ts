@@ -19,7 +19,7 @@ export const POST = staffRoute<{ id: string }>(async ({ req, session, params }) 
   if (!b) throw new HttpError('NOT_FOUND', 'Booking not found');
   if (b.status !== 'PENDING_STAFF')
     throw new HttpError('DOMAIN_GUARD_FAILED', 'BOOKING_NOT_AWAITING_STAFF');
-  const simulation = (await queries().lookups(session.ctx.tenantId)).tenant?.simulation ?? false;
+  const simulation = (await queries().lookups(session.ctx.tenantId, session.ctx.siteIds)).tenant?.simulation ?? false;
   const result = await caseCommands().confirmBooking(session.ctx, {
     caseId: b.caseId,
     expectedVersion: body.expectedVersion,

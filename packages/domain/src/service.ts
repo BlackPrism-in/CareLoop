@@ -1,3 +1,4 @@
+import { sealEvent } from './event-chain';
 import type {
   ActionType,
   Case,
@@ -6,7 +7,7 @@ import type {
   SupportedLanguage,
 } from '@careloop/contracts';
 import type { ApprovalCheck } from './approval';
-import { assertPermitted, type ActorContext, type CommandName } from './context';
+import { assertPermitted, canAccessSite, type ActorContext, type CommandName } from './context';
 import { DomainError, guardFailed, notFound, versionConflict } from './errors';
 import { caseFingerprint } from './fingerprint';
 import { hashPayload, sha256 } from './hashing';
@@ -20,6 +21,8 @@ export interface ServiceConfig {
   outreachEnabled: boolean;
   maxContactAttempts: number;
   maxCaseAudioSeconds: number;
+  /** Undefined = every supported language. */
+  enabledLanguages?: readonly Case['language'][];
 }
 
 export interface ServiceDeps {
@@ -105,6 +108,11 @@ export class CaseCommands {
 
   // ---- helpers -------------------------------------------------------------
 
+  private requireLanguage(language: Case['language']): void {
+    const on = this.deps.config.enabledLanguages;
+    if (on && !on.includes(language)) throw guardFailed('LANGUAGE_NOT_ENABLED');
+  }
+
   private operationId(ctx: ActorContext, command: CommandName, key: string): string {
     if (!key || key.length > 200)
       throw new DomainError('VALIDATION_FAILED', 'IDEMPOTENCY_KEY_REQUIRED');
@@ -148,7 +156,7 @@ export class CaseCommands {
     const { after, now } = args;
     const ts = now.toISOString();
     const eventId = `${after.caseId}-v${after.version}`;
-    const event: EventEnvelope = {
+    const event: EventEnvelope = sealEvent({
       schemaVersion: 1,
       eventId,
       eventType: args.transition.eventType,
@@ -164,9 +172,9 @@ export class CaseCommands {
       nextVersion: after.version,
       simulation: args.simulation,
       payload: args.transition.payload,
-    };
+    }, args.before?.lastEventHash);
     this.syncHandoff(tx, ctx, args.before, after, args.transition, now);
-    tx.putCase(after);
+    tx.putCase({ ...after, lastEventHash: event.hash! });
     tx.appendEvent(event);
     (args.transition.outbox ?? []).forEach((draft, i) => {
       const item: OutboxRecord = {
@@ -232,7 +240,7 @@ export class CaseCommands {
       const replayed = await this.replay(tx, operationId, payloadHash);
       if (replayed) return replayed;
       const c = await tx.getCase(req.caseId);
-      if (!c) throw notFound('CASE');
+      if (!c || !canAccessSite(ctx, c.siteId)) throw notFound('CASE');
       if (c.version !== req.expectedVersion) throw versionConflict(req.expectedVersion, c.version);
       const tenant = await tx.getTenant();
       if (!tenant) throw notFound('TENANT');
@@ -368,6 +376,7 @@ export class CaseCommands {
     if (Number.isNaN(Date.parse(input.dueAt))) bad.dueAt = 'invalid datetime';
     if (Object.keys(bad).length)
       throw new DomainError('VALIDATION_FAILED', 'VALIDATION_FAILED', 'invalid case', bad);
+    this.requireLanguage(input.language);
 
     const operationId = this.operationId(ctx, 'createCase', req.idempotencyKey);
     const payloadHash = hashPayload({ command: 'createCase', input });
@@ -377,6 +386,7 @@ export class CaseCommands {
 
       // Every reference must resolve inside this tenant; cross-tenant ids look like 404.
       const tenant = await this.load(tx.getTenant(), 'TENANT');
+      if (!canAccessSite(ctx, input.siteId)) throw notFound('SITE');
       await this.load(tx.getSite(input.siteId), 'SITE');
       const patient = await this.load(tx.getPatient(input.patientId), 'PATIENT');
       const consent = await this.load(tx.getConsent(input.consentId), 'CONSENT');
@@ -452,6 +462,7 @@ export class CaseCommands {
 
   editDraft(ctx: ActorContext, req: CommandRequest<T.DraftEdit>) {
     return this.execute(ctx, 'editDraft', req, async (c, tx) => {
+      if (req.input.language) this.requireLanguage(req.input.language);
       if (req.input.ownerId) {
         const owner = await this.load(tx.getMember(req.input.ownerId), 'OWNER');
         if (owner.status !== 'ACTIVE') throw guardFailed('OWNER_NOT_ACTIVE');
@@ -496,6 +507,7 @@ export class CaseCommands {
   /** MVP-03. All eligibility is re-checked here, at execution time. */
   dispatchContact(ctx: ActorContext, req: CommandRequest<{ channel: ContactChannel }>) {
     return this.execute(ctx, 'dispatchContact', req, async (c, tx, now) => {
+      this.requireLanguage(c.language); // a language switched off later stops new contact
       const [tenant, site, consent, patient] = await Promise.all([
         this.load(tx.getTenant(), 'TENANT'),
         this.load(tx.getSite(c.siteId), 'SITE'),

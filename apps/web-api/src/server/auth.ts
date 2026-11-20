@@ -1,6 +1,6 @@
 import 'server-only';
 import { loadConfig, type Member } from '@careloop/contracts';
-import type { ActorContext } from '@careloop/domain';
+import { siteScopeFor, type ActorContext } from '@careloop/domain';
 import { adminAuth } from './firebase';
 import { HttpError } from './errors';
 import { queries } from './services';
@@ -44,7 +44,14 @@ export async function requireStaff(req: Request, correlationId: string): Promise
 
   return {
     member,
-    ctx: { tenantId, actorType: 'STAFF', actorId: uid, roles: member.roleSet, correlationId },
+    ctx: {
+      tenantId,
+      actorType: 'STAFF',
+      actorId: uid,
+      roles: member.roleSet,
+      correlationId,
+      siteIds: siteScopeFor(member.roleSet, member.permittedSiteIds),
+    },
   };
 }
 

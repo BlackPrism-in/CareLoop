@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 export const GET = staffRoute(async ({ req, session }) => {
   const q = ListCasesQuery.parse(Object.fromEntries(new URL(req.url).searchParams));
   const page = await queries().listCases(session.ctx.tenantId, {
+    siteIds: session.ctx.siteIds,
     workflowState: q.workflowState,
     ownerId: q.owner === 'me' ? session.ctx.actorId : undefined,
     handoffPending: q.view === 'handoffs',

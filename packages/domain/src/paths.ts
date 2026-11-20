@@ -26,6 +26,8 @@ export const TENANT_COLLECTIONS = [
   'handoffs',
   'operations',
   'inbox',
+  'lims_inbox',
+  'invoices',
   'outbox',
   'jobs',
   'failed_jobs',

@@ -2,6 +2,8 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { BillingCard } from '@/components/billing-card';
+import { SitesAdmin } from '@/components/sites-admin';
 import { Button, Card, Field, inputClass, LoadError, Notice, Skeleton } from '@/components/ui';
 import { api, describeError } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
@@ -15,6 +17,8 @@ export default function SettingsPage() {
       <h1 className="text-lg font-semibold">Settings</h1>
       {hasRole('OWNER', 'AUDITOR') && <Operations />}
       {hasRole('OWNER') && <Usage />}
+      {hasRole('OWNER') && <SitesAdmin />}
+      {hasRole('OWNER') && <BillingCard />}
       {hasRole('OWNER', 'COORDINATOR', 'AUDITOR') ? (
         <FailedJobs canReplay={hasRole('OWNER')} />
       ) : (

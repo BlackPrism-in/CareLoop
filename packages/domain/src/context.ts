@@ -14,6 +14,21 @@ export interface ActorContext {
   /** Staff roles from membership; empty for non-staff actors. */
   roles: readonly StaffRole[];
   correlationId: string;
+  /**
+   * Sites this actor may act on. Undefined or 'ALL' = every site (owners,
+   * auditors, system and agent actors). Staff with a site list only see and
+   * change cases at those sites; anything else looks like it doesn't exist.
+   */
+  siteIds?: readonly string[] | 'ALL';
+}
+
+export function canAccessSite(ctx: Pick<ActorContext, 'siteIds'>, siteId: string): boolean {
+  return ctx.siteIds === undefined || ctx.siteIds === 'ALL' || ctx.siteIds.includes(siteId);
+}
+
+/** Owners and auditors see every site; other staff only their permitted sites. */
+export function siteScopeFor(roles: readonly StaffRole[], permittedSiteIds: readonly string[]): readonly string[] | 'ALL' {
+  return roles.some((r) => r === 'OWNER' || r === 'AUDITOR') ? 'ALL' : permittedSiteIds;
 }
 
 export type CommandName =
@@ -64,7 +79,8 @@ const plus = (rule: Rule, ...actors: ActorType[]): Rule => ({
  * - Agents act only through the command gateway and never approve, cancel, verify or reopen.
  */
 export const PERMISSIONS: Record<CommandName, Rule> = {
-  createCase: staff('COORDINATOR', 'REVIEWER'),
+  // SYSTEM: signed LIMS/hospital order intake. A new case is always a DRAFT needing reviewer approval.
+  createCase: plus(staff('COORDINATOR', 'REVIEWER'), 'SYSTEM'),
   editDraft: staff('COORDINATOR', 'REVIEWER'),
   approve: staff('REVIEWER'),
   dispatchContact: plus(staff('COORDINATOR'), 'SYSTEM'),
