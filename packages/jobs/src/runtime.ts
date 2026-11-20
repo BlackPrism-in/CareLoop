@@ -11,6 +11,7 @@ import { OutboxDispatcher } from './dispatcher';
 import { createHandlers } from './handlers';
 import { CloudTasksQueue, LocalHttpQueue, type TaskQueue } from './queue';
 import { JobRunner } from './runner';
+import { TimeSweeps } from './sweeps';
 
 export interface JobRuntime {
   commands: CaseCommands;
@@ -18,6 +19,7 @@ export interface JobRuntime {
   queue: TaskQueue;
   dispatcher: OutboxDispatcher;
   runner: JobRunner;
+  sweeps: TimeSweeps;
 }
 
 export function bookingAdapterFor(cfg: AppConfig, db: Firestore): BookingAdapter {
@@ -63,5 +65,6 @@ export function createJobRuntime(cfg: AppConfig, db: Firestore, log: Logger): Jo
     queue,
     dispatcher: new OutboxDispatcher(db, queue, log),
     runner: new JobRunner(db, createHandlers({ db, commands, booking, log }), log),
+    sweeps: new TimeSweeps(db, commands, log),
   };
 }

@@ -1,9 +1,12 @@
 import type { Firestore } from 'firebase-admin/firestore';
-import type { Case } from '@careloop/contracts';
+import type { Case, Consent } from '@careloop/contracts';
 import type { BookingAdapter, ReservationResult } from '@careloop/adapters';
 import {
   approvalIsCurrent,
+  consentIsActive,
   DomainError,
+  sha256,
+  type HandoffDoc,
   tenantCollection,
   tenantRecord,
   type ActorContext,
@@ -13,6 +16,8 @@ import {
 import type { Logger } from '@careloop/observability';
 import { PermanentError, TransientError, type JobHandler } from './runner';
 import type { BookingDoc, BookingStatus, OutboxDoc } from './types';
+import type { NotificationDoc } from './sweeps';
+import type { InboxDoc } from './webhooks';
 
 export interface HandlerDeps {
   db: Firestore;
@@ -188,9 +193,13 @@ export function createHandlers(deps: HandlerDeps): Partial<Record<OutboxDoc['kin
     );
 
     // Execution-time re-check: approval, suppression and workflow state.
+    const consent = (await db.doc(tenantRecord(tenantId, 'consents', c.consentId)).get()).data() as
+      Consent | undefined;
     const eligible =
       c.workflowState === 'AWAITING_BOOKING' &&
       approvalIsCurrent(c) &&
+      !!consent &&
+      consentIsActive(consent, clock()) &&
       !['OPTED_OUT', 'DECLINED'].includes(c.outreachDisposition);
     if (!eligible) {
       await putBooking(tenantId, bookingId, { status: 'REJECTED', reason: 'NO_LONGER_ELIGIBLE' });
@@ -303,20 +312,118 @@ export function createHandlers(deps: HandlerDeps): Partial<Record<OutboxDoc['kin
     return { status: 'DONE', result: { outcome: 'CANCELLED', caseUpdated: cmd.applied } };
   };
 
+  /**
+   * A verified provider callback (MVP spec §17–18). Attendance/collection
+   * becomes evidence through the deterministic matcher. Cancellations apply
+   * only if newer than what we know; a late event never resurrects state.
+   */
+  const providerEvent: JobHandler = async ({ tenantId, outbox: o }) => {
+    const inboxRef = db.doc(tenantRecord(tenantId, 'inbox', String(o.payload.inboxId)));
+    const inbox = (await inboxRef.get()).data() as InboxDoc | undefined;
+    if (!inbox) throw new PermanentError('INBOX_NOT_FOUND');
+    const ev = inbox.event;
+    const settle = async (status: InboxDoc['status'], detail: string | null) => {
+      await inboxRef.update({ status, detail });
+      return { status: 'DONE' as const, result: { inbox: status, detail } };
+    };
+    const bookingSnap = ev.externalBookingRef
+      ? await db
+          .collection(tenantCollection(tenantId, 'bookings'))
+          .where('externalRef', '==', ev.externalBookingRef)
+          .limit(1)
+          .get()
+      : null;
+    const bookingRef = bookingSnap?.docs[0]?.ref ?? null;
+    const b = bookingSnap?.docs[0]?.data() as
+      (BookingDoc & { lastSourceSequence?: number }) | undefined;
+    if (b && ev.sourceSequence !== undefined && (b.lastSourceSequence ?? -1) >= ev.sourceSequence)
+      return settle('STALE', 'OLDER_THAN_KNOWN_STATE');
+    if (bookingRef && ev.sourceSequence !== undefined)
+      await bookingRef.update({ lastSourceSequence: ev.sourceSequence });
+
+    if (ev.eventType === 'APPOINTMENT_ATTENDED' || ev.eventType === 'SAMPLE_COLLECTED') {
+      const r = await command(tenantId, o, 'evidence', (ctx, base) =>
+        commands.recordEvidence(
+          { ...ctx, actorType: 'PROVIDER', actorId: `${inbox.provider}:${inbox.account}` },
+          {
+            ...base,
+            input: {
+              evidenceId: `ev_${sha256(inbox.inboxId).slice(0, 24)}`,
+              kind: 'PROVIDER_EVENT',
+              issuer: `${inbox.provider}:${inbox.account}`,
+              eventType: ev.eventType as 'APPOINTMENT_ATTENDED' | 'SAMPLE_COLLECTED',
+              patientRef: ev.patientExternalRef,
+              bookingRef: ev.externalBookingRef ?? null,
+              occurredAt: ev.occurredAt,
+              sourceRef: inbox.inboxId,
+              sourceHash: inbox.rawHash,
+              simulation: ev.simulation,
+            },
+          },
+        ),
+      );
+      return r.applied
+        ? settle('PROCESSED', r.result?.eventType ?? r.reason ?? null)
+        : settle('NEEDS_REVIEW', r.reason ?? null);
+    }
+    if (ev.eventType === 'APPOINTMENT_CANCELLED') {
+      const c = await readCase(tenantId, o.caseId);
+      if (
+        !ev.externalBookingRef ||
+        c.bookingRef !== ev.externalBookingRef ||
+        c.bookingState !== 'CONFIRMED'
+      )
+        return settle('STALE', 'NOT_THE_CURRENT_BOOKING');
+      if (bookingRef)
+        await bookingRef.update({
+          status: 'CANCELLED',
+          reason: 'CANCELLED_BY_PROVIDER',
+          updatedAt: clock().toISOString(),
+        });
+      const r = await command(tenantId, o, 'provider-cancel', (ctx, base) =>
+        commands.recordBookingCancelled(
+          { ...ctx, actorType: 'PROVIDER', actorId: `${inbox.provider}:${inbox.account}` },
+          { ...base, input: { externalRef: ev.externalBookingRef! } },
+        ),
+      );
+      return settle(r.applied ? 'PROCESSED' : 'NEEDS_REVIEW', r.reason ?? 'BOOKING_CANCELLED');
+    }
+    // APPOINTMENT_CONFIRMED: bookings are confirmed by the reservation acknowledgment; recorded only.
+    return settle('PROCESSED', 'CONFIRMATION_RECORDED');
+  };
+
+  /** In-app notification to the handoff owner. Delivery channels (SMS, email) are a pilot decision. */
+  const handoffNotify: JobHandler = async ({ tenantId, outbox: o }) => {
+    const c = await readCase(tenantId, o.caseId);
+    if (!c.activeHandoffId) return { status: 'SKIPPED', result: { reason: 'NO_OPEN_HANDOFF' } };
+    const h = (await db.doc(tenantRecord(tenantId, 'handoffs', c.activeHandoffId)).get()).data() as
+      HandoffDoc | undefined;
+    if (!h) return { status: 'SKIPPED', result: { reason: 'HANDOFF_NOT_FOUND' } };
+    const id = `${h.handoffId}-assigned-${h.ownerId}`;
+    const n: NotificationDoc = {
+      notificationId: id,
+      recipientId: h.ownerId,
+      kind: 'HANDOFF_ASSIGNED',
+      caseId: c.caseId,
+      handoffId: h.handoffId,
+      createdAt: clock().toISOString(),
+      readAt: null,
+    };
+    await db.doc(tenantRecord(tenantId, 'notifications', id)).set(n);
+    return { status: 'DONE', result: { notified: h.ownerId } };
+  };
+
   return {
     BOOKING_REQUEST: bookingRequest,
     BOOKING_RECONCILE: bookingReconcile,
     BOOKING_CANCEL: bookingCancel,
-    // Phase 4 connects contact attempts to the voice gateway; nothing is dialled here.
+    // Contact attempts are carried out by the supervised voice gateway session, not dialled here.
     CONTACT_ATTEMPT: async () => ({
       status: 'SKIPPED',
-      result: { reason: 'VOICE_GATEWAY_NOT_CONNECTED' },
+      result: { reason: 'HANDLED_BY_VOICE_SESSION' },
     }),
-    // Phase 5 adds staff notifications; the handoff itself is already visible in the queue.
-    HANDOFF_NOTIFY: async () => ({
-      status: 'SKIPPED',
-      result: { reason: 'NOTIFICATIONS_NOT_CONNECTED' },
-    }),
+    PROVIDER_EVENT: providerEvent,
+    HANDOFF_NOTIFY: handoffNotify,
     // Suppression is enforced by execution-time checks in every handler and command.
     SUPPRESS_PENDING_WORK: async () => ({
       status: 'DONE',

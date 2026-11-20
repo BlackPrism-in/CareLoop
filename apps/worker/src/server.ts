@@ -20,9 +20,9 @@ serve({ fetch: createApp(runtime).fetch, port }, () =>
 if (cfg.APP_ENV === 'local') {
   setInterval(
     () =>
-      void runtime.dispatcher
-        .sweep()
-        .catch((e) => log.warn('sweep failed', { error: (e as Error).message })),
+      void Promise.all([runtime.dispatcher.sweep(), runtime.sweeps.run()]).catch((e) =>
+        log.warn('sweep failed', { error: (e as Error).message }),
+      ),
     10_000,
   );
 }

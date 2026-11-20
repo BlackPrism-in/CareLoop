@@ -32,6 +32,7 @@ export interface OutboxDraft {
     | 'BOOKING_REQUEST'
     | 'BOOKING_RECONCILE'
     | 'BOOKING_CANCEL'
+    | 'PROVIDER_EVENT'
     | 'HANDOFF_NOTIFY'
     | 'SUPPRESS_PENDING_WORK';
   payload: Record<string, unknown>;
@@ -68,6 +69,7 @@ export function consentIsActive(consent: Consent, now: Date, channel?: ContactCh
 }
 
 const SUPPRESSED: readonly OutreachDisposition[] = ['OPTED_OUT', 'DECLINED'];
+const handoffOpen = (c: Case) => c.handoffState === 'PENDING' || c.handoffState === 'ACKNOWLEDGED';
 
 // ---------------------------------------------------------------------------
 // Drafting and approval
@@ -242,7 +244,10 @@ export function recordContactOutcome(
       outreachDisposition: outcome,
       audioSecondsUsed: c.audioSecondsUsed + input.audioSeconds,
       ...(stops
-        ? { automationPausedReason: 'HANDOFF' as const, handoffState: 'PENDING' as const }
+        ? {
+            automationPausedReason: 'HANDOFF' as const,
+            ...(handoffOpen(c) ? {} : { handoffState: 'PENDING' as const }),
+          }
         : {}),
     },
     eventType: 'CONTACT_OUTCOME_RECORDED',
@@ -316,7 +321,7 @@ export function recordPatientRequest(
     patch: {
       workflowState: 'AWAITING_BOOKING',
       outreachDisposition: 'REACHED',
-      ...(callback ? { handoffState: 'PENDING' as const } : {}),
+      ...(callback && !handoffOpen(c) ? { handoffState: 'PENDING' as const } : {}),
     },
     eventType: 'PATIENT_REQUEST_RECORDED',
     payload: {
@@ -379,6 +384,7 @@ export function confirmBooking(
       bookingState: 'CONFIRMED',
       workflowState: 'BOOKED',
       bookedStartsAt: new Date(input.startsAt).toISOString(),
+      bookingRef: input.externalRef,
     },
     eventType: 'BOOKING_CONFIRMED',
     payload: {
@@ -420,6 +426,7 @@ export function recordBookingCancelled(
     patch: {
       bookingState: 'CANCELLED',
       bookedStartsAt: null,
+      bookingRef: null,
       workflowState: 'AWAITING_BOOKING',
       automationPausedReason: canReschedule ? c.automationPausedReason : 'REVIEW_REQUIRED',
     },
@@ -624,6 +631,20 @@ export function acknowledgeHandoff(c: Case, input: { staffId: string }): Transit
     patch: { handoffState: 'ACKNOWLEDGED' },
     eventType: 'HANDOFF_ACKNOWLEDGED',
     payload: { staffId: input.staffId },
+  };
+}
+
+/** Moves an open handoff to another named staff member. */
+export function reassignHandoff(c: Case, input: { ownerId: string }): Transition {
+  if (c.handoffState !== 'PENDING' && c.handoffState !== 'ACKNOWLEDGED')
+    throw guardFailed('NO_OPEN_HANDOFF');
+  return {
+    patch: { handoffState: 'PENDING' },
+    eventType: 'HANDOFF_REASSIGNED',
+    payload: { ownerId: input.ownerId },
+    outbox: [
+      { kind: 'HANDOFF_NOTIFY', payload: { reasonCode: 'REASSIGNED', ownerId: input.ownerId } },
+    ],
   };
 }
 

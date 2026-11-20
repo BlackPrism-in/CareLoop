@@ -579,6 +579,224 @@ export function commandSuite(name: string, backend: () => TestBackend) {
       expect(types.slice(-2)).toEqual(['COMPLETION_VERIFIED', 'CASE_REOPENED']);
     });
 
+    it('MVP-08/09: a matching provider event completes; a wrong one is rejected with its reason, atomically', async () => {
+      await d.toBooked();
+      now = new Date('2026-11-23T12:00:00Z');
+      const evidence = (id: string, o: Record<string, unknown> = {}) => ({
+        evidenceId: id,
+        kind: 'PROVIDER_EVENT' as const,
+        issuer: 'sandbox_calendar',
+        eventType: 'APPOINTMENT_ATTENDED' as const,
+        patientRef: 'ref_p1',
+        bookingRef: 'booking_1',
+        occurredAt: '2026-11-23T11:05:00Z',
+        sourceRef: `evt_${id}`,
+        simulation: true,
+        ...o,
+      });
+      const wrong = d.track(
+        await svc.recordEvidence(SYSTEM, d.req(evidence('ev_wrong', { patientRef: 'ref_other' }))),
+      );
+      expect(wrong.workflowState).toBe('BOOKED');
+      expect(wrong.evidenceState).toBe('REJECTED');
+      expect(await b.read(tenantRecord(T1, 'evidence', 'ev_wrong'))).toMatchObject({
+        status: 'REJECTED',
+        reasons: ['PATIENT_REF_MISMATCH'],
+      });
+      // Coordinators and agents cannot inject a "trusted" provider event.
+      await rejects(
+        svc.recordEvidence(coordinator, d.req(evidence('ev_fake'))),
+        'STAFF_CANNOT_recordProviderEvidence',
+      );
+      const ok = d.track(await svc.recordEvidence(SYSTEM, d.req(evidence('ev_ok'))));
+      expect(ok.workflowState).toBe('COMPLETED_VERIFIED');
+      expect(await b.read(tenantRecord(T1, 'evidence', 'ev_ok'))).toMatchObject({
+        status: 'VERIFIED',
+        decisionReason: 'DETERMINISTIC_MATCH',
+      });
+      expect((await events()).at(-1)?.payload).toMatchObject({ evidenceId: 'ev_ok' });
+    });
+
+    it('a staff record waits for a verifier; a self-report can never be attested as verified', async () => {
+      await d.toBooked();
+      now = new Date('2026-11-23T12:00:00Z');
+      const self = d.track(
+        await svc.recordEvidence(
+          AGENT,
+          d.req({
+            evidenceId: 'ev_self',
+            kind: 'SELF_REPORT' as const,
+            issuer: 'patient',
+            eventType: 'APPOINTMENT_ATTENDED' as const,
+            patientRef: null,
+            bookingRef: null,
+            occurredAt: '2026-11-23T11:00:00Z',
+            sourceRef: 'call',
+            simulation: true,
+          }),
+        ),
+      );
+      expect(self.evidenceState).toBe('SELF_REPORTED');
+      await rejects(
+        svc.attestEvidence(
+          verifier,
+          d.req({
+            evidenceId: 'ev_self',
+            decision: 'VERIFY' as const,
+            reason: 'Patient said so',
+            sourceRef: '',
+          }),
+        ),
+        'SELF_REPORT_NOT_INDEPENDENT',
+      );
+
+      const staffRec = d.track(
+        await svc.recordEvidence(
+          coordinator,
+          d.req({
+            evidenceId: 'ev_reg',
+            kind: 'STAFF_RECORD' as const,
+            issuer: 'Demo Clinic register',
+            eventType: 'APPOINTMENT_ATTENDED' as const,
+            patientRef: null,
+            bookingRef: null,
+            occurredAt: '2026-11-23T11:10:00Z',
+            sourceRef: 'register page 14',
+            simulation: true,
+          }),
+        ),
+      );
+      expect(staffRec.evidenceState).toBe('UNDER_REVIEW');
+      expect(staffRec.workflowState).toBe('BOOKED');
+      await rejects(
+        svc.attestEvidence(
+          coordinator,
+          d.req({ evidenceId: 'ev_reg', decision: 'VERIFY' as const, reason: 'x', sourceRef: '' }),
+        ),
+        'ONLY_VERIFIER_CAN_ATTEST',
+      );
+      const done = d.track(
+        await svc.attestEvidence(
+          verifier,
+          d.req({
+            evidenceId: 'ev_reg',
+            decision: 'VERIFY' as const,
+            reason: 'Seen in clinic register',
+            sourceRef: 'register page 14',
+          }),
+        ),
+      );
+      expect(done.workflowState).toBe('COMPLETED_VERIFIED');
+      expect(await b.read(tenantRecord(T1, 'evidence', 'ev_reg'))).toMatchObject({
+        status: 'VERIFIED',
+        decidedBy: 'u_ver',
+      });
+    });
+
+    it('a conflicted record blocks automatic completion until a verifier resolves it', async () => {
+      await d.toBooked();
+      now = new Date('2026-11-23T12:00:00Z');
+      const ev = (id: string, bookingRef: string) => ({
+        evidenceId: id,
+        kind: 'PROVIDER_EVENT' as const,
+        issuer: 'cal',
+        eventType: 'APPOINTMENT_ATTENDED' as const,
+        patientRef: 'ref_p1',
+        bookingRef,
+        occurredAt: '2026-11-23T11:05:00Z',
+        sourceRef: id,
+        simulation: true,
+      });
+      const conflicted = d.track(
+        await svc.recordEvidence(SYSTEM, d.req(ev('ev_c', 'booking_other'))),
+      );
+      expect(conflicted.evidenceState).toBe('CONFLICTED');
+      await rejects(
+        svc.recordEvidence(SYSTEM, d.req(ev('ev_m', 'booking_1'))),
+        'RESOLVE_CONFLICT_FIRST',
+      );
+      d.track(
+        await svc.attestEvidence(
+          verifier,
+          d.req({
+            evidenceId: 'ev_c',
+            decision: 'REJECT' as const,
+            reason: 'Different appointment',
+            sourceRef: '',
+          }),
+        ),
+      );
+      const done = d.track(await svc.recordEvidence(SYSTEM, d.req(ev('ev_m2', 'booking_1'))));
+      expect(done.workflowState).toBe('COMPLETED_VERIFIED');
+    });
+
+    it('MVP-11: handoff records follow the case; only the owner (or a reviewer/owner) acknowledges', async () => {
+      await d.create();
+      await d.approve();
+      await d.dispatch();
+      d.track(
+        await svc.createHandoff(
+          AGENT,
+          d.req({
+            reasonCode: 'MEDICAL_QUESTION',
+            ownerId: 'u_coord',
+            dueAt: '2026-11-21T09:00:00Z',
+          }),
+        ),
+      );
+      const c = await getCase();
+      expect(c?.activeHandoffId).toBe('CL-1-h4');
+      expect(await b.read(tenantRecord(T1, 'handoffs', 'CL-1-h4'))).toMatchObject({
+        status: 'PENDING',
+        ownerId: 'u_coord',
+        reasonCode: 'MEDICAL_QUESTION',
+      });
+      await rejects(svc.acknowledgeHandoff(verifier, d.req({})), 'NOT_HANDOFF_OWNER');
+      d.track(await svc.reassignHandoff(reviewer, d.req({ ownerId: 'u_ver' })));
+      expect(await b.read(tenantRecord(T1, 'handoffs', 'CL-1-h4'))).toMatchObject({
+        ownerId: 'u_ver',
+        status: 'PENDING',
+      });
+      d.track(await svc.acknowledgeHandoff(verifier, d.req({})));
+      d.track(
+        await svc.resolveHandoff(
+          verifier,
+          d.req({
+            resolution: 'Called back; no medical urgency raised with us',
+            resumeAutomation: false,
+          }),
+        ),
+      );
+      expect(await b.read(tenantRecord(T1, 'handoffs', 'CL-1-h4'))).toMatchObject({
+        status: 'RESOLVED',
+        resolvedBy: 'u_ver',
+      });
+      const after = await getCase();
+      expect(after?.activeHandoffId).toBeNull();
+      expect(after?.workflowState).toBe('CONTACTING'); // resolving a handoff never completes the follow-up
+    });
+
+    it('a callback request and an unreachable patient both create a handoff record', async () => {
+      await d.create();
+      await d.approve();
+      await d.dispatch();
+      d.track(
+        await svc.recordPatientRequest(
+          AGENT,
+          d.req({
+            interactionId: 'i',
+            identityAssurance: 'SIMULATED' as const,
+            request: 'CALLBACK' as const,
+          }),
+        ),
+      );
+      const c = await getCase();
+      expect(await b.read(tenantRecord(T1, 'handoffs', c!.activeHandoffId!))).toMatchObject({
+        reasonCode: 'CALLBACK_REQUESTED',
+        status: 'PENDING',
+      });
+    });
+
     // ---- MVP-10 idempotency and concurrency ----------------------------------
 
     it('MVP-10: replaying the same request returns the same result with no second transition', async () => {

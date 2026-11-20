@@ -166,3 +166,5 @@ infra/*.tfstate*
 emulator-data/
 infra/**/*.tfvars
 !infra/**/*.tfvars.example
+
+.DS_Store

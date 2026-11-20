@@ -9,6 +9,7 @@ export const TASK_KINDS = {
   'booking-request': 'BOOKING_REQUEST',
   'booking-reconcile': 'BOOKING_RECONCILE',
   'booking-cancel': 'BOOKING_CANCEL',
+  'provider-event': 'PROVIDER_EVENT',
   'contact-attempt': 'CONTACT_ATTEMPT',
   'handoff-notify': 'HANDOFF_NOTIFY',
   'suppress-pending-work': 'SUPPRESS_PENDING_WORK',
@@ -23,7 +24,10 @@ export function createApp(runtime: JobRuntime) {
   const app = new Hono();
   app.get('/healthz', (c) => c.json({ status: 'ok', service: 'careloop-worker' }));
 
-  app.post('/tasks/recovery-sweep', async (c) => c.json(await runtime.dispatcher.sweep()));
+  // Scheduler entry point: recover stuck outbox work, then time-based checks.
+  app.post('/tasks/recovery-sweep', async (c) =>
+    c.json({ ...(await runtime.dispatcher.sweep()), ...(await runtime.sweeps.run()) }),
+  );
 
   app.post('/tasks/:kind', async (c) => {
     const kind = c.req.param('kind');

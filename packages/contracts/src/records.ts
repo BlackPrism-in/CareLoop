@@ -105,6 +105,10 @@ export const Case = z.strictObject({
   audioSecondsUsed: z.number().int().nonnegative(),
   /** Confirmed booking start, copied from the reservation acknowledgment. */
   bookedStartsAt: isoTime.nullable(),
+  /** External reservation reference from the acknowledgment; evidence can be matched against it. */
+  bookingRef: z.string().nullable(),
+  /** The open human handoff record for this case, if any. */
+  activeHandoffId: z.string().nullable(),
   workflowState: WorkflowState,
   outreachDisposition: OutreachDisposition,
   handoffState: HandoffState,

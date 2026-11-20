@@ -1,3 +1,4 @@
+import { afterAll } from 'vitest';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { FirestoreStore } from './firestore-store';
@@ -13,6 +14,12 @@ const projectId = 'demo-careloop-test';
 
 const app = getApps()[0] ?? initializeApp({ projectId });
 const db = getFirestore(app);
+
+// Let in-flight background writes settle, then close gRPC streams so the emulator can shut down cleanly.
+afterAll(async () => {
+  await new Promise((r) => setTimeout(r, 500));
+  await db.terminate();
+});
 db.settings({ ignoreUndefinedProperties: false });
 
 commandSuite('firestore emulator', () => {

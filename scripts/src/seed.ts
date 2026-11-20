@@ -45,6 +45,8 @@ for (const s of bundle.slots) {
     endsAt: new Date(Date.parse(s.endsAt) + shift).toISOString(),
   });
 }
+// Sandbox calendar account → this tenant (webhook tenant mapping is server-side, never from payloads).
+batch.set(db.doc('provider_accounts/sandbox__demo-calendar'), { tenantId: t, active: true });
 await batch.commit();
 
 // Staff logins in the Auth EMULATOR. The tenant is a server-set custom claim;

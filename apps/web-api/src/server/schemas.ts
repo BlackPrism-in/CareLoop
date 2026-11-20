@@ -91,3 +91,52 @@ export const VoiceSessionBody = z.strictObject({
 });
 
 export const IntakeBody = z.strictObject({ text: z.string().trim().min(20).max(8000) });
+
+const isoDateTime = z.iso.datetime();
+const shortText = (max: number) => z.string().trim().min(1).max(max);
+
+export const RecordEvidenceBody = z.strictObject({
+  expectedVersion: version,
+  kind: z.enum(['STAFF_RECORD', 'SELF_REPORT']),
+  issuer: shortText(120),
+  eventType: z.enum(['APPOINTMENT_ATTENDED', 'SAMPLE_COLLECTED']),
+  occurredAt: isoDateTime,
+  sourceRef: shortText(200),
+  patientRef: z.string().trim().max(120).optional(),
+  bookingRef: z.string().trim().max(120).optional(),
+  /** Administrative excerpt only (attendance line, receipt line). Not report content. */
+  excerpt: z.string().trim().max(2000).optional(),
+});
+
+export const AttestBody = z.strictObject({
+  expectedVersion: version,
+  decision: z.enum(['VERIFY', 'REJECT']),
+  reason: shortText(300),
+  sourceRef: z.string().trim().max(200).default(''),
+});
+
+export const SimulateEventBody = z.strictObject({
+  scenario: z.enum(['MATCHING', 'WRONG_PATIENT', 'WRONG_BOOKING']),
+});
+
+export const HandoffActionBody = z.strictObject({
+  expectedVersion: version,
+  resolution: z.string().trim().max(500).optional(),
+  resumeAutomation: z.boolean().optional(),
+  ownerId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,128}$/)
+    .optional(),
+});
+
+export const ReasonBody = z.strictObject({ expectedVersion: version, reason: shortText(300) });
+export const RevokeConsentBody = z.strictObject({ reason: shortText(300) });
+export const OutreachPauseBody = z.strictObject({ paused: z.boolean(), reason: shortText(300) });
+
+export const PatientSessionBody = z.strictObject({
+  token: z.string().max(80),
+  code: z.string().max(10),
+});
+export const PatientActionBody = z.strictObject({
+  action: z.enum(['REQUEST_CHANGE', 'REQUEST_CALLBACK', 'STOP_CONTACT']),
+});

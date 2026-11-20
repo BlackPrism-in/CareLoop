@@ -6,6 +6,9 @@ import { HandoffBadge, OverdueBadge, PausedBadge, WorkflowStatus } from '@/compo
 import { BookingPanel } from '@/components/booking-panel';
 import { Timeline } from '@/components/timeline';
 import { VoicePanel } from '@/components/voice-panel';
+import { CaseActions } from '@/components/case-actions';
+import { EvidencePanel } from '@/components/evidence-panel';
+import { HandoffCard } from '@/components/handoff-card';
 import { Button, Card, Field, inputClass, LoadError, Notice, Skeleton } from '@/components/ui';
 import { api, describeError } from '@/lib/api';
 import {
@@ -30,7 +33,11 @@ const OUTREACH: Record<string, string> = {
 
 export default function CaseWorkspace({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { hasRole } = useAuth();
+  const { hasRole, me } = useAuth();
+  const { data: lookups } = useData<Lookups | null>(
+    () => (hasRole('OWNER', 'REVIEWER') ? api<Lookups>('/v1/lookups') : Promise.resolve(null)),
+    [me?.uid],
+  );
   const { data, error, loading, updatedAt, refresh } = useData<CaseDetail>(
     () => api<CaseDetail>(`/v1/cases/${encodeURIComponent(id)}`),
     [id],
@@ -106,6 +113,33 @@ export default function CaseWorkspace({ params }: { params: Promise<{ id: string
         />
       )}
 
+      <CaseActions
+        detail={data}
+        onChanged={(msg) => {
+          setToast(msg);
+          void refresh();
+        }}
+      />
+
+      {data.handoff && data.handoff.status !== 'RESOLVED' && (
+        <Card title="Human handoff">
+          <HandoffCard
+            h={{
+              ...data.handoff,
+              ownerName:
+                names.get(data.handoff.ownerId) ??
+                lookups?.members.find((m) => m.uid === data.handoff!.ownerId)?.displayName,
+              caseVersion: c.version,
+            }}
+            members={lookups?.members ?? []}
+            onChanged={(msg) => {
+              setToast(msg);
+              void refresh();
+            }}
+          />
+        </Card>
+      )}
+
       {hasRole('COORDINATOR') &&
         ['CONTACTING', 'AWAITING_BOOKING'].includes(c.workflowState) &&
         c.bookingState !== 'CONFIRMED' && (
@@ -150,22 +184,14 @@ export default function CaseWorkspace({ params }: { params: Promise<{ id: string
         <Card title="Activity timeline">
           <Timeline events={data.events} names={names} />
         </Card>
-        <Card title="Completion evidence">
-          {c.evidenceState === 'VERIFIED' ? (
-            <Notice tone="ok">Completion verified from attributable evidence.</Notice>
-          ) : (
-            <>
-              <p className="text-sm">
-                {c.evidenceState === 'SELF_REPORTED'
-                  ? 'Patient says it happened. Not yet verified.'
-                  : 'No verified attendance received.'}
-              </p>
-              <p className="mt-1 text-sm text-[var(--muted)]">
-                A booking is not proof of completion.
-              </p>
-            </>
-          )}
-        </Card>
+        <EvidencePanel
+          detail={data}
+          simulation={me?.tenant?.simulation ?? false}
+          onChanged={(msg) => {
+            setToast(msg);
+            void refresh();
+          }}
+        />
       </div>
       <p className="text-right text-xs text-[var(--muted)]">
         Refreshes every 5 s · last updated {updatedAt}

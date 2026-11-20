@@ -13,3 +13,7 @@ export * from './firestore-store';
 export * from './sources';
 export * from './queries';
 export * from './voice-tickets';
+export * from './records';
+export * from './evidence';
+export * from './patient-links';
+export * from './consent';

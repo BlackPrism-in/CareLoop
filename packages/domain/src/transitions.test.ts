@@ -23,6 +23,8 @@ const base = {
   contactAttempts: 0,
   audioSecondsUsed: 0,
   bookedStartsAt: null,
+  bookingRef: null,
+  activeHandoffId: null,
   workflowState: 'READY',
   outreachDisposition: 'NOT_STARTED',
   handoffState: 'NONE',

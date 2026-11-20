@@ -39,7 +39,11 @@ export type CommandName =
   | 'acknowledgeHandoff'
   | 'resolveHandoff'
   | 'cancelCase'
-  | 'reopenCase';
+  | 'reopenCase'
+  | 'reassignHandoff'
+  | 'recordProviderEvidence'
+  | 'recordStaffEvidence'
+  | 'attestEvidence';
 
 interface Rule {
   roles: readonly StaffRole[];
@@ -78,11 +82,15 @@ export const PERMISSIONS: Record<CommandName, Rule> = {
   recordEvidenceReview: plus(staff('VERIFIER'), 'SYSTEM'),
   verifyCompletion: plus(staff('VERIFIER'), 'SYSTEM'),
   optOut: plus(staff('COORDINATOR', 'REVIEWER', 'OWNER'), 'AGENT', 'PATIENT', 'SYSTEM'),
-  createHandoff: plus(staff('COORDINATOR', 'REVIEWER', 'VERIFIER'), 'AGENT', 'SYSTEM'),
+  createHandoff: plus(staff('COORDINATOR', 'REVIEWER', 'VERIFIER'), 'AGENT', 'SYSTEM', 'PATIENT'),
   acknowledgeHandoff: staff('COORDINATOR', 'REVIEWER', 'VERIFIER', 'OWNER'),
   resolveHandoff: staff('COORDINATOR', 'REVIEWER', 'VERIFIER', 'OWNER'),
   cancelCase: staff('REVIEWER', 'OWNER'),
   reopenCase: staff('REVIEWER', 'VERIFIER', 'OWNER'),
+  reassignHandoff: staff('REVIEWER', 'OWNER'),
+  recordProviderEvidence: { roles: [], actors: ['SYSTEM', 'PROVIDER'] },
+  recordStaffEvidence: staff('VERIFIER', 'COORDINATOR'),
+  attestEvidence: staff('VERIFIER'),
 };
 
 export function assertPermitted(ctx: ActorContext, command: CommandName): void {

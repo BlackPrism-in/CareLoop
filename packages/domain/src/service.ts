@@ -12,6 +12,8 @@ import { caseFingerprint } from './fingerprint';
 import { hashPayload, sha256 } from './hashing';
 import type { CommandResult, OperationRecord, OutboxRecord, Store, Tx } from './store';
 import * as T from './transitions';
+import { matchEvidence } from './evidence';
+import type { EvidenceDoc, EvidenceEventType, HandoffDoc } from './records';
 
 export interface ServiceConfig {
   outreachEnabled: boolean;
@@ -44,6 +46,21 @@ export interface CreateCaseInput {
   dueAt: string;
   ownerId: string;
   language: SupportedLanguage;
+}
+
+export interface EvidenceInput {
+  evidenceId: string;
+  kind: 'PROVIDER_EVENT' | 'STAFF_RECORD' | 'SELF_REPORT';
+  issuer: string;
+  eventType: EvidenceEventType;
+  patientRef: string | null;
+  bookingRef: string | null;
+  occurredAt: string;
+  sourceRef: string;
+  sourceHash?: string | null;
+  simulation: boolean;
+  excerpt?: string | null;
+  aiReview?: Record<string, unknown> | null;
 }
 
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -147,6 +164,7 @@ export class CaseCommands {
       simulation: args.simulation,
       payload: args.transition.payload,
     };
+    this.syncHandoff(tx, ctx, args.before, after, args.transition, now);
     tx.putCase(after);
     tx.appendEvent(event);
     (args.transition.outbox ?? []).forEach((draft, i) => {
@@ -245,6 +263,83 @@ export class CaseCommands {
     return x;
   }
 
+  /**
+   * Keeps the handoff record in step with the case's handoff axis, whichever
+   * command moved it (agent handoff, callback request, unreachable patient,
+   * staff action). Write-only, so it is safe after the transaction's reads.
+   */
+  private syncHandoff(
+    tx: Tx,
+    ctx: ActorContext,
+    before: Case | null,
+    after: Case,
+    t: Pick<T.Transition, 'eventType' | 'payload'>,
+    now: Date,
+  ) {
+    const prev = before?.handoffState ?? 'NONE';
+    const ts = now.toISOString();
+    if (after.handoffState === 'PENDING' && prev !== 'PENDING' && prev !== 'ACKNOWLEDGED') {
+      const handoffId = `${after.caseId}-h${after.version}`;
+      const doc: HandoffDoc = {
+        handoffId,
+        caseId: after.caseId,
+        reasonCode: String(
+          t.payload.reasonCode ??
+            (t.payload.request === 'CALLBACK' ? 'CALLBACK_REQUESTED' : `AFTER_${t.eventType}`),
+        ),
+        ownerId: String(t.payload.ownerId ?? after.ownerId),
+        status: 'PENDING',
+        createdBy: ctx.actorId,
+        createdAt: ts,
+        dueAt:
+          typeof t.payload.dueAt === 'string'
+            ? t.payload.dueAt
+            : new Date(now.getTime() + 4 * 3_600_000).toISOString(),
+        acknowledgedBy: null,
+        acknowledgedAt: null,
+        resolvedBy: null,
+        resolvedAt: null,
+        resolution: null,
+        backupNotifiedAt: null,
+      };
+      tx.putHandoff(doc, 'create');
+      after.activeHandoffId = handoffId;
+      return;
+    }
+    const id = after.activeHandoffId;
+    if (!id) return;
+    if (after.handoffState === 'ACKNOWLEDGED' && prev === 'PENDING') {
+      tx.putHandoff(
+        { handoffId: id, status: 'ACKNOWLEDGED', acknowledgedBy: ctx.actorId, acknowledgedAt: ts },
+        'merge',
+      );
+    } else if (after.handoffState === 'RESOLVED' && prev !== 'RESOLVED') {
+      tx.putHandoff(
+        {
+          handoffId: id,
+          status: 'RESOLVED',
+          resolvedBy: ctx.actorId,
+          resolvedAt: ts,
+          resolution: String(t.payload.resolution ?? ''),
+        },
+        'merge',
+      );
+      after.activeHandoffId = null;
+    } else if (t.eventType === 'HANDOFF_REASSIGNED') {
+      tx.putHandoff(
+        {
+          handoffId: id,
+          ownerId: String(t.payload.ownerId),
+          status: 'PENDING',
+          acknowledgedBy: null,
+          acknowledgedAt: null,
+          backupNotifiedAt: null,
+        },
+        'merge',
+      );
+    }
+  }
+
   // ---- commands ------------------------------------------------------------
 
   /**
@@ -319,6 +414,8 @@ export class CaseCommands {
         contactAttempts: 0,
         audioSecondsUsed: 0,
         bookedStartsAt: null,
+        bookingRef: null,
+        activeHandoffId: null,
         workflowState: 'DRAFT',
         outreachDisposition: 'NOT_STARTED',
         handoffState: 'NONE',
@@ -602,9 +699,202 @@ export class CaseCommands {
 
   /** MVP-11. */
   acknowledgeHandoff(ctx: ActorContext, req: CommandRequest<Record<string, never>>) {
-    return this.execute(ctx, 'acknowledgeHandoff', req, (c) =>
-      T.acknowledgeHandoff(c, { staffId: ctx.actorId }),
+    return this.execute(ctx, 'acknowledgeHandoff', req, async (c, tx) => {
+      // The named owner takes responsibility; an owner or reviewer may take it over.
+      const h = c.activeHandoffId ? await tx.getHandoff(c.activeHandoffId) : null;
+      if (
+        h &&
+        h.ownerId !== ctx.actorId &&
+        !ctx.roles.some((r) => r === 'OWNER' || r === 'REVIEWER')
+      ) {
+        throw new DomainError('FORBIDDEN', 'NOT_HANDOFF_OWNER');
+      }
+      return T.acknowledgeHandoff(c, { staffId: ctx.actorId });
+    });
+  }
+
+  reassignHandoff(ctx: ActorContext, req: CommandRequest<{ ownerId: string }>) {
+    return this.execute(ctx, 'reassignHandoff', req, async (c, tx) => {
+      const m = await this.load(tx.getMember(req.input.ownerId), 'OWNER');
+      if (m.status !== 'ACTIVE') throw guardFailed('OWNER_NOT_ACTIVE');
+      return T.reassignHandoff(c, { ownerId: req.input.ownerId });
+    });
+  }
+
+  /**
+   * MVP-08/09: record an evidence candidate and apply the deterministic match
+   * in one transaction. Provider events that match complete the case; staff
+   * records wait for a verifier; mismatches are rejected or conflicted with a
+   * reason; self-reports are kept separate.
+   */
+  async recordEvidence(ctx: ActorContext, req: CommandRequest<EvidenceInput>) {
+    const input = req.input;
+    const command: CommandName =
+      input.kind === 'PROVIDER_EVENT'
+        ? 'recordProviderEvidence'
+        : input.kind === 'STAFF_RECORD'
+          ? 'recordStaffEvidence'
+          : 'recordSelfReport';
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(input.evidenceId))
+      throw new DomainError('VALIDATION_FAILED', 'INVALID_EVIDENCE_ID');
+    return this.execute(
+      ctx,
+      command,
+      req,
+      async (c, tx, now) => {
+        if (await tx.getEvidence(input.evidenceId))
+          throw new DomainError('VERSION_CONFLICT', 'EVIDENCE_EXISTS');
+        const patient = await this.load(tx.getPatient(c.patientId), 'PATIENT');
+        let t: T.Transition;
+        let status: EvidenceDoc['status'];
+        let reasons: string[] = [];
+        if (input.kind === 'SELF_REPORT') {
+          t = T.recordSelfReport(c, { statedOccurredAt: input.occurredAt });
+          status = 'SELF_REPORTED';
+        } else {
+          const m = matchEvidence(c, patient, { ...input, kind: input.kind }, now);
+          reasons = m.reasons;
+          if (m.outcome === 'MATCH') {
+            t = T.verifyCompletion(
+              c,
+              {
+                kind: 'TRUSTED_EVENT',
+                evidenceId: input.evidenceId,
+                occurredAt: input.occurredAt,
+                sourceRef: input.sourceRef,
+                matched: true,
+              },
+              now,
+            );
+            status = 'VERIFIED';
+          } else if (m.outcome === 'REVIEW') {
+            t = T.recordEvidenceReview(c, {
+              evidenceId: input.evidenceId,
+              result: 'UNDER_REVIEW',
+              reasonCode: 'AWAITING_ATTESTATION',
+            });
+            status = 'CANDIDATE';
+          } else {
+            const result = m.outcome === 'CONFLICT' ? 'CONFLICTED' : 'REJECTED';
+            // A wrong record never downgrades a case whose other evidence is still under review.
+            t = T.recordEvidenceReview(c, {
+              evidenceId: input.evidenceId,
+              result,
+              reasonCode: m.reasons[0]!,
+            });
+            if (
+              result === 'REJECTED' &&
+              (c.evidenceState === 'UNDER_REVIEW' ||
+                c.evidenceState === 'CONFLICTED' ||
+                c.evidenceState === 'SELF_REPORTED')
+            ) {
+              t = { ...t, patch: {} };
+            }
+            status = result;
+          }
+        }
+        const doc: EvidenceDoc = {
+          evidenceId: input.evidenceId,
+          caseId: c.caseId,
+          kind: input.kind,
+          issuer: input.issuer,
+          eventType: input.eventType,
+          patientRef: input.patientRef,
+          bookingRef: input.bookingRef,
+          occurredAt: input.occurredAt,
+          receivedAt: now.toISOString(),
+          sourceRef: input.sourceRef,
+          sourceHash: input.sourceHash ?? null,
+          simulation: input.simulation,
+          status,
+          reasons,
+          excerpt: input.excerpt ? input.excerpt.slice(0, 2000) : null,
+          aiReview: input.aiReview ?? null,
+          recordedBy: ctx.actorId,
+          decidedBy: status === 'VERIFIED' ? ctx.actorId : null,
+          decidedAt: status === 'VERIFIED' ? now.toISOString() : null,
+          decisionReason: status === 'VERIFIED' ? 'DETERMINISTIC_MATCH' : null,
+        };
+        tx.putEvidence(doc, 'create');
+        return {
+          ...t,
+          eventType: input.kind === 'SELF_REPORT' ? t.eventType : `EVIDENCE_${status}`,
+          payload: { ...t.payload, evidenceId: input.evidenceId, kind: input.kind, reasons },
+        };
+      },
+      { simulation: input.simulation },
     );
+  }
+
+  /**
+   * A named verifier decides on a candidate or conflicted record. Verifying
+   * requires a cited source and a reason; a patient's own statement can never
+   * be verified this way (MVP spec §03).
+   */
+  async attestEvidence(
+    ctx: ActorContext,
+    req: CommandRequest<{
+      evidenceId: string;
+      decision: 'VERIFY' | 'REJECT';
+      reason: string;
+      sourceRef: string;
+    }>,
+  ) {
+    if (!(ctx.actorType === 'STAFF' && ctx.roles.includes('VERIFIER')))
+      throw new DomainError('FORBIDDEN', 'ONLY_VERIFIER_CAN_ATTEST');
+    const input = req.input;
+    return this.execute(ctx, 'attestEvidence', req, async (c, tx, now) => {
+      const ev = await this.load(tx.getEvidence(input.evidenceId), 'EVIDENCE');
+      if (ev.caseId !== c.caseId) throw notFound('EVIDENCE');
+      if (!input.reason.trim()) throw guardFailed('REASON_REQUIRED');
+      if (ev.status !== 'CANDIDATE' && ev.status !== 'CONFLICTED' && ev.status !== 'SELF_REPORTED')
+        throw guardFailed('EVIDENCE_ALREADY_DECIDED');
+      let t: T.Transition;
+      if (input.decision === 'VERIFY') {
+        if (ev.kind === 'SELF_REPORT') throw guardFailed('SELF_REPORT_NOT_INDEPENDENT');
+        const sourceRef = input.sourceRef.trim() || ev.sourceRef;
+        // Attesting the conflicted record itself is the explicit human resolution of that conflict.
+        const resolving =
+          ev.status === 'CONFLICTED' ? ({ ...c, evidenceState: 'UNDER_REVIEW' } as Case) : c;
+        t = T.verifyCompletion(
+          resolving,
+          {
+            kind: 'STAFF_ATTESTATION',
+            evidenceId: ev.evidenceId,
+            occurredAt: ev.occurredAt,
+            sourceRef,
+            verifierId: ctx.actorId,
+            reason: input.reason,
+          },
+          now,
+        );
+      } else {
+        t = T.recordEvidenceReview(c, {
+          evidenceId: ev.evidenceId,
+          result: 'REJECTED',
+          reasonCode: 'REJECTED_BY_VERIFIER',
+        });
+      }
+      tx.putEvidence(
+        {
+          evidenceId: ev.evidenceId,
+          status: input.decision === 'VERIFY' ? 'VERIFIED' : 'REJECTED',
+          decidedBy: ctx.actorId,
+          decidedAt: now.toISOString(),
+          decisionReason: input.reason,
+        },
+        'merge',
+      );
+      return {
+        ...t,
+        payload: {
+          ...t.payload,
+          evidenceId: ev.evidenceId,
+          decision: input.decision,
+          reason: input.reason,
+        },
+      };
+    });
   }
 
   resolveHandoff(

@@ -10,7 +10,7 @@
   "sites": [
     {
       "siteId": "site_demo_main",
-      "displayName": "Demo Lab — Main Branch",
+      "displayName": "Demo Lab \u2014 Main Branch",
       "timeZone": "Asia/Kolkata",
       "contactWindow": {
         "start": "09:00",
@@ -65,7 +65,7 @@
       "patientId": "pat_demo_01",
       "externalRef": "patient_ref_demo_01",
       "alias": "Patient A",
-      "contactMasked": "+91 •••••• 0101",
+      "contactMasked": "+91 \u2022\u2022\u2022\u2022\u2022\u2022 0101",
       "ageEligibility": "ADULT_CONFIRMED",
       "language": "hi-IN",
       "identityMethodRef": "supervised_demo"
@@ -74,7 +74,7 @@
       "patientId": "pat_demo_02",
       "externalRef": "patient_ref_demo_02",
       "alias": "Patient B",
-      "contactMasked": "+91 •••••• 0102",
+      "contactMasked": "+91 \u2022\u2022\u2022\u2022\u2022\u2022 0102",
       "ageEligibility": "ADULT_CONFIRMED",
       "language": "en-IN",
       "identityMethodRef": "supervised_demo"
@@ -83,7 +83,7 @@
       "patientId": "pat_demo_03",
       "externalRef": "patient_ref_demo_03",
       "alias": "Patient C",
-      "contactMasked": "+91 •••••• 0103",
+      "contactMasked": "+91 \u2022\u2022\u2022\u2022\u2022\u2022 0103",
       "ageEligibility": "ADULT_CONFIRMED",
       "language": "hi-IN",
       "identityMethodRef": "supervised_demo"
@@ -92,7 +92,7 @@
       "patientId": "pat_demo_04",
       "externalRef": "patient_ref_demo_04",
       "alias": "Patient D",
-      "contactMasked": "+91 •••••• 0104",
+      "contactMasked": "+91 \u2022\u2022\u2022\u2022\u2022\u2022 0104",
       "ageEligibility": "UNKNOWN",
       "language": "en-IN",
       "identityMethodRef": "supervised_demo"
@@ -197,6 +197,8 @@
       "contactAttempts": 0,
       "audioSecondsUsed": 0,
       "bookedStartsAt": null,
+      "bookingRef": null,
+      "activeHandoffId": null,
       "workflowState": "DRAFT",
       "outreachDisposition": "NOT_STARTED",
       "handoffState": "NONE",
@@ -227,6 +229,8 @@
       "contactAttempts": 0,
       "audioSecondsUsed": 0,
       "bookedStartsAt": null,
+      "bookingRef": null,
+      "activeHandoffId": null,
       "workflowState": "DRAFT",
       "outreachDisposition": "NOT_STARTED",
       "handoffState": "NONE",
@@ -257,6 +261,8 @@
       "contactAttempts": 0,
       "audioSecondsUsed": 0,
       "bookedStartsAt": null,
+      "bookingRef": null,
+      "activeHandoffId": null,
       "workflowState": "DRAFT",
       "outreachDisposition": "NOT_STARTED",
       "handoffState": "NONE",
@@ -287,6 +293,8 @@
       "contactAttempts": 0,
       "audioSecondsUsed": 0,
       "bookedStartsAt": null,
+      "bookingRef": null,
+      "activeHandoffId": null,
       "workflowState": "DRAFT",
       "outreachDisposition": "NOT_STARTED",
       "handoffState": "NONE",

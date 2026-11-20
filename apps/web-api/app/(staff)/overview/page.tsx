@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { CaseTable } from '@/components/case-table';
+import { OutreachSwitch } from '@/components/outreach-switch';
 import { Button, cx, LoadError, Skeleton } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useData } from '@/lib/use-data';
@@ -40,6 +41,9 @@ export default function OverviewPage() {
           <Button variant="primary">+ New follow-up</Button>
         </Link>
       </div>
+
+      <OutreachSwitch />
+      <MyNotifications />
 
       {loading && !data ? (
         <Skeleton rows={2} />
@@ -98,5 +102,27 @@ export default function OverviewPage() {
         “Past due date” refers to the approved operational deadline, not a medical risk.
       </p>
     </div>
+  );
+}
+
+function MyNotifications() {
+  const { data } = useData<{ items: { notificationId: string; kind: string; caseId: string }[] }>(
+    () => api('/v1/notifications'),
+    [],
+    { pollMs: 30_000 },
+  );
+  if (!data || data.items.length === 0) return null;
+  const overdue = data.items.filter((n) => n.kind === 'HANDOFF_OVERDUE').length;
+  const assigned = data.items.length - overdue;
+  return (
+    <Link
+      href="/handoffs"
+      className="block rounded-md border border-[var(--warn-line)] bg-[var(--warn-bg)] px-3 py-2 text-sm"
+    >
+      ⚑ {assigned > 0 && `${assigned} handoff${assigned > 1 ? 's' : ''} assigned to you`}
+      {assigned > 0 && overdue > 0 && ' · '}
+      {overdue > 0 && `${overdue} overdue handoff${overdue > 1 ? 's' : ''} need a backup`} — open
+      the Human queue
+    </Link>
   );
 }

@@ -21,6 +21,7 @@ export class FirestoreStore implements Store {
       for (const w of tx.writes) {
         const ref = this.db.doc(w.path);
         if (w.mode === 'create') t.create(ref, w.data);
+        else if (w.mode === 'merge') t.set(ref, w.data, { merge: true });
         else t.set(ref, w.data);
       }
       return out;

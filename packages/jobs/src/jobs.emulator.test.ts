@@ -1,6 +1,6 @@
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Case, Slot } from '@careloop/contracts';
 import {
   ManualBookingAdapter,
@@ -29,6 +29,12 @@ if (!host) throw new Error('run via `pnpm test:emulator`');
 const projectId = 'demo-careloop-jobs';
 const app = getApps()[0] ?? initializeApp({ projectId });
 const db = getFirestore(app);
+
+// Let in-flight background writes settle, then close gRPC streams so the emulator can shut down cleanly.
+afterAll(async () => {
+  await new Promise((r) => setTimeout(r, 500));
+  await db.terminate();
+});
 const log = createLogger('jobs-test');
 
 const slot = (slotId: string, startsAt: string, capacity = 1): Slot => ({

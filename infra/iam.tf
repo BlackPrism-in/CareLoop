@@ -43,3 +43,9 @@ resource "google_cloud_run_v2_service_iam_member" "worker_invoker" {
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.svc["tasks-invoker"].email}"
 }
+
+resource "google_secret_manager_secret_iam_member" "web_api_webhook_secrets" {
+  secret_id = google_secret_manager_secret.secrets["webhook-signing-secrets"].id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.svc["web-api"].email}"
+}

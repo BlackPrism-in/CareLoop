@@ -39,6 +39,7 @@ locals {
     TASKS_INVOKER_EMAIL    = google_service_account.svc["tasks-invoker"].email
     WORKER_URL             = local.worker_url
     VOICE_ALLOWED_ORIGINS  = local.web_url
+    PATIENT_LINK_BASE_URL  = local.web_url
     VOICE_PUBLIC_URL       = local.voice_wss
   }
 }

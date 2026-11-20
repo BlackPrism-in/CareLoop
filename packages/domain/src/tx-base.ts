@@ -10,8 +10,9 @@ import type {
 } from '@careloop/contracts';
 import { caseEvents, tenantDoc, tenantRecord } from './paths';
 import type { OperationRecord, OutboxRecord, Tx } from './store';
+import type { EvidenceDoc, HandoffDoc } from './records';
 
-export type PendingWrite = { path: string; data: object; mode: 'set' | 'create' };
+export type PendingWrite = { path: string; data: object; mode: 'set' | 'create' | 'merge' };
 
 /**
  * Shared Tx logic over a path-based reader. Writes are buffered and returned
@@ -42,6 +43,8 @@ export class BufferedTx implements Tx {
   getSource = (id: string) => this.rec<Source>('sources', id);
   getCase = (id: string) => this.rec<Case>('cases', id);
   getOperation = (id: string) => this.rec<OperationRecord>('operations', id);
+  getEvidence = (id: string) => this.rec<EvidenceDoc>('evidence', id);
+  getHandoff = (id: string) => this.rec<HandoffDoc>('handoffs', id);
   getCaseIdByFingerprint = async (fp: string) =>
     (await this.rec<{ caseId: string }>('case_fingerprints', fp))?.caseId ?? null;
 
@@ -79,5 +82,15 @@ export class BufferedTx implements Tx {
       data: o,
       mode: 'create',
     });
+  }
+  putEvidence(e: Partial<EvidenceDoc> & { evidenceId: string }, mode: 'create' | 'merge') {
+    this.writes.push({
+      path: tenantRecord(this.tenantId, 'evidence', e.evidenceId),
+      data: e,
+      mode,
+    });
+  }
+  putHandoff(h: Partial<HandoffDoc> & { handoffId: string }, mode: 'create' | 'merge') {
+    this.writes.push({ path: tenantRecord(this.tenantId, 'handoffs', h.handoffId), data: h, mode });
   }
 }

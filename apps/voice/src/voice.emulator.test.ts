@@ -1,6 +1,6 @@
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import type { AddressInfo } from 'node:net';
 import { loadConfig, type Case, type Slot } from '@careloop/contracts';
@@ -24,6 +24,12 @@ if (!host) throw new Error('run via `pnpm test:emulator`');
 const projectId = 'demo-careloop-voice';
 const app = getApps()[0] ?? initializeApp({ projectId });
 const db = getFirestore(app);
+
+// Let in-flight background writes settle, then close gRPC streams so the emulator can shut down cleanly.
+afterAll(async () => {
+  await new Promise((r) => setTimeout(r, 500));
+  await db.terminate();
+});
 const log = createLogger('voice-test');
 
 /** Plays the model's side: the test injects tool calls and transcripts and reads what the gateway sent back. */

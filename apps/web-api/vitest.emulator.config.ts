@@ -9,6 +9,7 @@ export default defineConfig({
     },
   },
   test: {
+    fileParallelism: false,
     include: ['test/**/*.emulator.test.ts'],
     testTimeout: 20000,
     hookTimeout: 30000,
@@ -18,6 +19,7 @@ export default defineConfig({
       COORDINATION_MODEL_ID: 'test-coord',
       VERIFICATION_MODEL_ID: 'test-verify',
       LIVE_MODEL_ID: 'test-live',
+      WEBHOOK_SIGNING_SECRETS: '{"sandbox:demo-calendar":"api-test-webhook-secret-01"}',
     },
   },
 });

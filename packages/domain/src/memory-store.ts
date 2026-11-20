@@ -34,7 +34,11 @@ export class MemoryStore implements Store {
         if (w.mode === 'create' && this.docs.has(w.path))
           throw new Error(`document already exists: ${w.path}`);
       }
-      for (const w of tx.writes) this.docs.set(w.path, structuredClone(w.data));
+      for (const w of tx.writes) {
+        const prev =
+          w.mode === 'merge' ? ((this.docs.get(w.path) as object | undefined) ?? {}) : {};
+        this.docs.set(w.path, structuredClone({ ...prev, ...w.data }));
+      }
       return out;
     };
     const p = this.queue.then(run, run);

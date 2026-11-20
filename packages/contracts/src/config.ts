@@ -41,6 +41,33 @@ export const AppConfig = z.object({
   TASKS_INVOKER_EMAIL: z.string().optional(),
   WORKER_URL: z.string().url().default('http://127.0.0.1:8081'),
   FIRESTORE_EMULATOR_HOST: z.string().optional(),
+  /**
+   * Provider webhook signing secrets as JSON {"<provider>:<account>": "<secret>"}.
+   * Injected from Secret Manager in deployed environments.
+   */
+  WEBHOOK_SIGNING_SECRETS: z
+    .string()
+    .default('{}')
+    .transform((s, ctx) => {
+      try {
+        const v = JSON.parse(s) as unknown;
+        if (
+          v &&
+          typeof v === 'object' &&
+          Object.values(v).every((x) => typeof x === 'string' && x.length >= 16)
+        )
+          return v as Record<string, string>;
+      } catch {
+        /* fall through */
+      }
+      ctx.addIssue({
+        code: 'custom',
+        message: 'must be a JSON object of secrets (16+ chars each)',
+      });
+      return z.NEVER;
+    }),
+  /** Base URL patients use for their link page. */
+  PATIENT_LINK_BASE_URL: z.string().default('http://localhost:3000'),
   /** Browser origins allowed to open voice sessions (comma-separated). */
   VOICE_ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
   /** WebSocket base URL the browser uses to reach the voice gateway. */

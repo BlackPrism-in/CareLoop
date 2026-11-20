@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getAuth } from 'firebase-admin/auth';
 import type { FixtureBundle } from '@careloop/contracts';
 import { tenantDoc, tenantRecord } from '@careloop/domain';
@@ -17,6 +17,17 @@ import { GET as getOperation } from '../app/v1/operations/[id]/route';
 import { POST as replayJob } from '../app/v1/jobs/[id]/replay/route';
 import { POST as voiceSession } from '../app/v1/voice/sessions/route';
 import { consumeVoiceTicket } from '@careloop/domain';
+import { signSandboxPayload } from '@careloop/jobs';
+import { POST as recordEvidence } from '../app/v1/cases/[id]/evidence/route';
+import { POST as attest } from '../app/v1/evidence/[id]/attest/route';
+import { POST as webhook } from '../app/webhooks/[provider]/[account]/route';
+import { POST as revoke } from '../app/v1/consents/[id]/revoke/route';
+import { POST as pauseOutreach } from '../app/v1/settings/outreach/route';
+import { POST as createLink } from '../app/v1/cases/[id]/patient-links/route';
+import { POST as patientSession } from '../app/v1/p/session/route';
+import { GET as patientMe } from '../app/v1/p/me/route';
+import { POST as patientAction } from '../app/v1/p/actions/route';
+import { POST as handoffAction } from '../app/v1/handoffs/[id]/[action]/route';
 
 /**
  * Exercises the real route handlers against the Auth + Firestore emulators
@@ -34,6 +45,12 @@ const T = fixture.tenant.tenantId;
 const OTHER = 't_other_lab';
 
 const tokens: Record<string, string> = {};
+
+// Let background kicks settle, then close gRPC streams so the emulators shut down cleanly.
+afterAll(async () => {
+  await new Promise((r) => setTimeout(r, 500));
+  await firestore().terminate();
+});
 // Relative to the real clock: these routes use wall-clock time.
 const DUE = new Date(Date.now() + 30 * 86_400_000).toISOString();
 const SLOT_AT = new Date(Date.now() + 3 * 86_400_000).toISOString();
@@ -132,6 +149,17 @@ beforeAll(async () => {
     uid: 'suspended_user',
     email: 'gone@demo.careloop.test',
     status: 'SUSPENDED',
+  });
+  batch.set(db.doc('provider_accounts/sandbox__demo-calendar'), { tenantId: T, active: true });
+  batch.set(db.doc(tenantRecord(T, 'patients', 'pat_api_05')), {
+    ...fixture.patients[0]!,
+    patientId: 'pat_api_05',
+    externalRef: 'patient_ref_api_05',
+  });
+  batch.set(db.doc(tenantRecord(T, 'consents', 'consent_api_05')), {
+    ...fixture.consents[0]!,
+    consentId: 'consent_api_05',
+    patientId: 'pat_api_05',
   });
   await batch.commit();
 
@@ -608,5 +636,416 @@ describe('staff API on emulators', () => {
       createdBy: 'staff_demo_01',
     });
     expect(await consumeVoiceTicket(firestore(), s.ticket)).toBeNull();
+  });
+
+  /** Creates, approves and (optionally) starts contact on a fresh case. Returns id + current version. */
+  async function readyCase(
+    ref: string,
+    consentId = 'consent_demo_01',
+    patientId = 'pat_demo_01',
+    contact = false,
+  ) {
+    const body = { ...newCaseBody(ref), consentId, patientId };
+    const c = await (
+      await createCase(
+        req('/v1/cases', { as: 'staff_demo_01', method: 'POST', key: `k-${ref}`, body }),
+        noParams,
+      )
+    ).json();
+    let v = (
+      await (
+        await approveCase(
+          req(`/v1/cases/${c.caseId}/approve`, {
+            as: 'staff_demo_reviewer',
+            method: 'POST',
+            key: `a-${ref}`,
+            body: { expectedVersion: c.version, sourceAuthorityRef: ref, checkedFields: CHECKS },
+          }),
+          params({ id: c.caseId }),
+        )
+      ).json()
+    ).version;
+    if (contact)
+      v = (
+        await (
+          await contactRequest(
+            req(`/v1/cases/${c.caseId}/contact-requests`, {
+              as: 'staff_demo_01',
+              method: 'POST',
+              key: `c-${ref}`,
+              body: { expectedVersion: v, channel: 'BROWSER_VOICE' },
+            }),
+            params({ id: c.caseId }),
+          )
+        ).json()
+      ).version;
+    return { id: c.caseId as string, v: v as number };
+  }
+
+  it('Phase 5: a staff record waits for a verifier; only a verifier attests; a self-report is never verified', async () => {
+    const { id, v } = await readyCase('ORD-EV');
+    const p = params({ id });
+    // Must be after the approval a moment ago: earlier attendance can't satisfy this obligation.
+    const ev = {
+      kind: 'STAFF_RECORD',
+      issuer: 'Other clinic letter',
+      eventType: 'APPOINTMENT_ATTENDED',
+      occurredAt: new Date().toISOString(),
+      sourceRef: 'letter 22/11',
+    };
+    const rec = await recordEvidence(
+      req(`/v1/cases/${id}/evidence`, {
+        as: 'staff_demo_01',
+        method: 'POST',
+        key: 'ev-1',
+        body: { expectedVersion: v, ...ev },
+      }),
+      p,
+    );
+    expect(rec.status).toBe(201);
+    const r1 = await rec.json();
+    expect(r1).toMatchObject({ workflowState: 'READY', evidenceState: 'UNDER_REVIEW' });
+    const evidenceId = (
+      await firestore().collection(`tenants/${T}/evidence`).where('caseId', '==', id).get()
+    ).docs[0]!.id;
+    const asCoord = await attest(
+      req(`/v1/evidence/${evidenceId}/attest`, {
+        as: 'staff_demo_01',
+        method: 'POST',
+        key: 'at-1',
+        body: { expectedVersion: r1.version, decision: 'VERIFY', reason: 'x', sourceRef: 'letter' },
+      }),
+      params({ id: evidenceId }),
+    );
+    expect(asCoord.status).toBe(403);
+    const ok = await attest(
+      req(`/v1/evidence/${evidenceId}/attest`, {
+        as: 'staff_demo_verifier',
+        method: 'POST',
+        key: 'at-2',
+        body: {
+          expectedVersion: r1.version,
+          decision: 'VERIFY',
+          reason: 'Confirmed by phone with the other clinic',
+          sourceRef: 'letter 22/11',
+        },
+      }),
+      params({ id: evidenceId }),
+    );
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toMatchObject({
+      workflowState: 'COMPLETED_VERIFIED',
+      bookingState: 'NONE',
+    });
+
+    const two = await readyCase('ORD-EV2');
+    const self = await (
+      await recordEvidence(
+        req(`/v1/cases/${two.id}/evidence`, {
+          as: 'staff_demo_01',
+          method: 'POST',
+          key: 'ev-s',
+          body: { expectedVersion: two.v, ...ev, kind: 'SELF_REPORT', issuer: 'patient' },
+        }),
+        params({ id: two.id }),
+      )
+    ).json();
+    expect(self.evidenceState).toBe('SELF_REPORTED');
+    const selfId = (
+      await firestore().collection(`tenants/${T}/evidence`).where('caseId', '==', two.id).get()
+    ).docs[0]!.id;
+    const no = await attest(
+      req(`/v1/evidence/${selfId}/attest`, {
+        as: 'staff_demo_verifier',
+        method: 'POST',
+        key: 'at-s',
+        body: {
+          expectedVersion: self.version,
+          decision: 'VERIFY',
+          reason: 'patient said so',
+          sourceRef: 'call',
+        },
+      }),
+      params({ id: selfId }),
+    );
+    expect(no.status).toBe(422);
+    expect((await no.json()).message).toBe('SELF_REPORT_NOT_INDEPENDENT');
+  });
+
+  it('Phase 5: webhooks need a valid signature; the tenant comes from the account, not the payload', async () => {
+    const event = {
+      eventId: 'wh-1',
+      eventType: 'APPOINTMENT_ATTENDED',
+      sourceSystem: 'sandbox_calendar',
+      patientExternalRef: 'patient_ref_demo_03',
+      occurredAt: new Date().toISOString(),
+      receivedAt: new Date().toISOString(),
+      simulation: true,
+    };
+    const raw = JSON.stringify(event);
+    const send = (sig: string, account = 'demo-calendar') =>
+      webhook(
+        new Request(`http://localhost/webhooks/sandbox/${account}`, {
+          method: 'POST',
+          body: raw,
+          headers: { 'x-careloop-signature': sig },
+        }),
+        { params: Promise.resolve({ provider: 'sandbox', account }) },
+      );
+    const now = Math.floor(Date.now() / 1000);
+    expect((await send(signSandboxPayload('wrong-secret-xxxxxxxxxxxx', now, raw))).status).toBe(
+      401,
+    );
+    expect(
+      (await send(signSandboxPayload('api-test-webhook-secret-01', now, raw), 'unknown')).status,
+    ).toBe(404);
+    const ok = await send(signSandboxPayload('api-test-webhook-secret-01', now, raw));
+    expect(ok.status).toBe(202);
+    expect((await send(signSandboxPayload('api-test-webhook-secret-01', now, raw))).status).toBe(
+      200,
+    ); // duplicate
+  });
+
+  it('MVP-07: withdrawing consent suppresses contact on every open case immediately', async () => {
+    const { id, v } = await readyCase('ORD-CONSENT', 'consent_api_05', 'pat_api_05');
+    expect(v).toBeGreaterThan(0);
+    const r = await revoke(
+      req('/v1/consents/consent_api_05/revoke', {
+        as: 'staff_demo_01',
+        method: 'POST',
+        body: { reason: 'Patient asked by phone' },
+      }),
+      params({ id: 'consent_api_05' }),
+    );
+    expect(r.status).toBe(200);
+    expect((await r.json()).casesSuppressed).toContain(id);
+    const detail = await (
+      await getCase(req(`/v1/cases/${id}`, { as: 'staff_demo_01' }), params({ id }))
+    ).json();
+    expect(detail.case.outreachDisposition).toBe('OPTED_OUT');
+    const blocked = await contactRequest(
+      req(`/v1/cases/${id}/contact-requests`, {
+        as: 'staff_demo_01',
+        method: 'POST',
+        key: 'cc',
+        body: { expectedVersion: detail.case.version, channel: 'BROWSER_VOICE' },
+      }),
+      params({ id }),
+    );
+    expect(blocked.status).toBe(422);
+  });
+
+  it('only an owner can pause outreach; a pause blocks contact at execution time', async () => {
+    const { id, v } = await readyCase('ORD-PAUSE');
+    expect(
+      (
+        await pauseOutreach(
+          req('/v1/settings/outreach', {
+            as: 'staff_demo_01',
+            method: 'POST',
+            body: { paused: true, reason: 'x' },
+          }),
+          noParams,
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await pauseOutreach(
+          req('/v1/settings/outreach', {
+            as: 'staff_demo_owner',
+            method: 'POST',
+            body: { paused: true, reason: 'Phone lines down' },
+          }),
+          noParams,
+        )
+      ).status,
+    ).toBe(200);
+    const blocked = await contactRequest(
+      req(`/v1/cases/${id}/contact-requests`, {
+        as: 'staff_demo_01',
+        method: 'POST',
+        key: 'pp',
+        body: { expectedVersion: v, channel: 'BROWSER_VOICE' },
+      }),
+      params({ id }),
+    );
+    expect((await blocked.json()).message).toBe('SITE_PAUSED');
+    await pauseOutreach(
+      req('/v1/settings/outreach', {
+        as: 'staff_demo_owner',
+        method: 'POST',
+        body: { paused: false, reason: 'Lines restored' },
+      }),
+      noParams,
+    );
+  });
+
+  it('patient link: code gate, no private data, actions as the patient, lock after five wrong codes', async () => {
+    const { id } = await readyCase('ORD-LINK', 'consent_demo_02', 'pat_demo_02', true);
+    expect(
+      (
+        await createLink(
+          req(`/v1/cases/${id}/patient-links`, {
+            as: 'staff_demo_reviewer',
+            method: 'POST',
+            body: {},
+          }),
+          params({ id }),
+        )
+      ).status,
+    ).toBe(403);
+    const link = await (
+      await createLink(
+        req(`/v1/cases/${id}/patient-links`, { as: 'staff_demo_01', method: 'POST', body: {} }),
+        params({ id }),
+      )
+    ).json();
+    const token = String(link.url).split('/p/')[1]!;
+    const sess = (code: string) =>
+      patientSession(
+        new Request('http://localhost/v1/p/session', {
+          method: 'POST',
+          body: JSON.stringify({ token, code }),
+        }),
+      );
+    expect((await patientMe(new Request('http://localhost/v1/p/me'))).status).toBe(401); // link alone shows nothing
+    const wrongCode = link.code === '000000' ? '111111' : '000000';
+    expect((await sess(wrongCode)).status).toBe(401);
+    const good = await sess(link.code);
+    expect(good.status).toBe(200);
+    const cookie = good.headers.get('set-cookie')!;
+    expect(cookie).toMatch(/HttpOnly/);
+    expect(cookie).toMatch(/SameSite=Strict/);
+    const asPatient = (r: string, init: RequestInit = {}) =>
+      new Request(`http://localhost${r}`, { ...init, headers: { cookie: cookie.split(';')[0]! } });
+    const me = await (await patientMe(asPatient('/v1/p/me'))).json();
+    expect(me).toMatchObject({
+      labName: 'Siliguri Demo Lab',
+      followUp: 'CONSULTATION',
+      automatedContact: true,
+      simulation: true,
+    });
+    expect(JSON.stringify(me)).not.toMatch(
+      /Patient B|patient_ref|\+91|actionText|Arrange the approved|staff_demo/,
+    );
+
+    expect(
+      (
+        await patientAction(
+          asPatient('/v1/p/actions', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'REQUEST_CALLBACK' }),
+          }),
+        )
+      ).status,
+    ).toBe(200);
+    let detail = await (
+      await getCase(req(`/v1/cases/${id}`, { as: 'staff_demo_01' }), params({ id }))
+    ).json();
+    expect(detail.handoff).toMatchObject({
+      reasonCode: 'CALLBACK_REQUESTED',
+      status: 'PENDING',
+      createdBy: 'patient:pat_demo_02',
+    });
+    expect(
+      (
+        await patientAction(
+          asPatient('/v1/p/actions', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'STOP_CONTACT' }),
+          }),
+        )
+      ).status,
+    ).toBe(200);
+    detail = await (
+      await getCase(req(`/v1/cases/${id}`, { as: 'staff_demo_01' }), params({ id }))
+    ).json();
+    expect(detail.consent.active).toBe(false);
+    expect(detail.case.outreachDisposition).toBe('OPTED_OUT');
+    // A patient session is not a staff credential.
+    expect((await getCase(asPatient(`/v1/cases/${id}`), params({ id }))).status).toBe(401);
+
+    const link2 = await (
+      await createLink(
+        req(`/v1/cases/${id}/patient-links`, { as: 'staff_demo_01', method: 'POST', body: {} }),
+        params({ id }),
+      )
+    ).json();
+    const token2 = String(link2.url).split('/p/')[1]!;
+    const bad = link2.code === '999999' ? '888888' : '999999';
+    for (let i = 0; i < 5; i++)
+      await patientSession(
+        new Request('http://localhost/v1/p/session', {
+          method: 'POST',
+          body: JSON.stringify({ token: token2, code: bad }),
+        }),
+      );
+    const locked = await patientSession(
+      new Request('http://localhost/v1/p/session', {
+        method: 'POST',
+        body: JSON.stringify({ token: token2, code: link2.code }),
+      }),
+    );
+    expect(locked.status).toBe(403);
+  });
+
+  it('MVP-11: only the handoff owner acknowledges unless a reviewer/owner takes over; reassignment works', async () => {
+    const { id } = await readyCase('ORD-HO', 'consent_demo_01', 'pat_demo_01', true);
+    const asked = await (
+      await patientRequest(
+        req(`/v1/cases/${id}/patient-requests`, {
+          as: 'staff_demo_01',
+          method: 'POST',
+          key: 'ho-p',
+          body: {
+            expectedVersion: (
+              await (
+                await getCase(req(`/v1/cases/${id}`, { as: 'staff_demo_01' }), params({ id }))
+              ).json()
+            ).case.version,
+            request: 'CALLBACK',
+          },
+        }),
+        params({ id }),
+      )
+    ).json();
+    const detail = await (
+      await getCase(req(`/v1/cases/${id}`, { as: 'staff_demo_01' }), params({ id }))
+    ).json();
+    const hid = detail.handoff.handoffId as string;
+    const hp = (action: string) => params({ id: hid, action });
+    const notOwner = await handoffAction(
+      req(`/v1/handoffs/${hid}/acknowledge`, {
+        as: 'staff_demo_verifier',
+        method: 'POST',
+        key: 'h1',
+        body: { expectedVersion: asked.version },
+      }),
+      hp('acknowledge'),
+    );
+    expect(notOwner.status).toBe(403);
+    const re = await (
+      await handoffAction(
+        req(`/v1/handoffs/${hid}/reassign`, {
+          as: 'staff_demo_reviewer',
+          method: 'POST',
+          key: 'h2',
+          body: { expectedVersion: asked.version, ownerId: 'staff_demo_verifier' },
+        }),
+        hp('reassign'),
+      )
+    ).json();
+    const ack = await handoffAction(
+      req(`/v1/handoffs/${hid}/acknowledge`, {
+        as: 'staff_demo_verifier',
+        method: 'POST',
+        key: 'h3',
+        body: { expectedVersion: re.version },
+      }),
+      hp('acknowledge'),
+    );
+    expect(ack.status).toBe(200);
+    expect((await ack.json()).workflowState).toBe('AWAITING_BOOKING'); // acknowledgment is not completion
   });
 });

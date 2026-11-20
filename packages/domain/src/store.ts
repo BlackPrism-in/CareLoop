@@ -9,6 +9,7 @@ import type {
   Tenant,
 } from '@careloop/contracts';
 import type { OutboxDraft } from './transitions';
+import type { EvidenceDoc, HandoffDoc } from './records';
 
 /** Durable idempotency record: one per (tenant, command, idempotency key). */
 export interface OperationRecord {
@@ -70,6 +71,8 @@ export interface Tx {
   getCase(caseId: string): Promise<Case | null>;
   getOperation(operationId: string): Promise<OperationRecord | null>;
   getCaseIdByFingerprint(fingerprint: string): Promise<string | null>;
+  getEvidence(evidenceId: string): Promise<EvidenceDoc | null>;
+  getHandoff(handoffId: string): Promise<HandoffDoc | null>;
 
   putCase(c: Case): void;
   /** Fails the transaction if the fingerprint is already indexed. */
@@ -78,6 +81,9 @@ export interface Tx {
   appendEvent(e: EventEnvelope): void;
   enqueueOutbox(o: OutboxRecord): void;
   putOperation(o: OperationRecord): void;
+  /** create: fails if it exists. merge: updates the given fields. */
+  putEvidence(e: Partial<EvidenceDoc> & { evidenceId: string }, mode: 'create' | 'merge'): void;
+  putHandoff(h: Partial<HandoffDoc> & { handoffId: string }, mode: 'create' | 'merge'): void;
 }
 
 export interface Store {
