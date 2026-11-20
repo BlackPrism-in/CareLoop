@@ -5,4 +5,5 @@ export * from './events';
 export * from './agent';
 export * from './config';
 export * from './records';
+export * from './intake';
 export * from './fixtures';
