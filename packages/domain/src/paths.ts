@@ -29,6 +29,7 @@ export const TENANT_COLLECTIONS = [
   'outbox',
   'jobs',
   'failed_jobs',
+  'case_fingerprints',
 ] as const;
 export type TenantCollection = (typeof TENANT_COLLECTIONS)[number];
 

@@ -1,3 +1,12 @@
 export * from './paths';
 export * from './fingerprint';
-// Phase 1 adds: transition guards, commands, repositories, idempotency, outbox.
+export * from './errors';
+export * from './context';
+export * from './hashing';
+export * from './approval';
+export * from './contact-window';
+export * from './transitions';
+export * from './store';
+export * from './service';
+export * from './memory-store';
+export * from './firestore-store';

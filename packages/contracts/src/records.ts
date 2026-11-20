@@ -96,6 +96,15 @@ export const Case = z.strictObject({
   language: SupportedLanguage,
   approvalRevision: z.number().int().nonnegative(),
   approvalHash: z.string().nullable(),
+  /** Set by the approve command; cleared when a material edit invalidates approval. */
+  approvedAt: isoTime.nullable(),
+  approvedBy: id.nullable(),
+  /** Patient contact attempts consumed (budget: MAX_CONTACT_ATTEMPTS). Webhook retries never count. */
+  contactAttempts: z.number().int().nonnegative(),
+  /** Billed voice seconds consumed (budget: MAX_CASE_AUDIO_SECONDS). */
+  audioSecondsUsed: z.number().int().nonnegative(),
+  /** Confirmed booking start, copied from the reservation acknowledgment. */
+  bookedStartsAt: isoTime.nullable(),
   workflowState: WorkflowState,
   outreachDisposition: OutreachDisposition,
   handoffState: HandoffState,
