@@ -29,6 +29,9 @@ export const AgentProposal = z.strictObject({
   }),
   sourceRefs: z.array(z.string().min(1)),
   missingFields: z.array(z.string().min(1)),
+  /** Optional conversation-only facts; captured by the patient, never decisions. */
+  capturedPreferences: z.array(z.string().min(1)).optional(),
+  capturedBarriers: z.array(z.string().min(1)).optional(),
 });
 export type AgentProposal = z.infer<typeof AgentProposal>;
 

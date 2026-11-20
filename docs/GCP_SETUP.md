@@ -76,7 +76,7 @@ All four rows must say `OK`.
 
 Consequences:
 - **Live voice audio is processed in the US or EU, not India.** That's acceptable for the synthetic-data demo. For the pilot it belongs in the processor/data-location review (Blueprint p.8). Don't claim India-only processing.
-- Google's Live language table lists Hindi (`hi-IN`) and English (India) bundled with Hindi. For Bengali it lists only `bn-BD` (Bangladesh), so Bengali stays gated until local-speaker testing passes.
+- Google's Live language table lists Hindi (`hi-IN`), English (India) (`en-IN`, bundled with Hindi), Bengali (`bn-BD`), and Nepali (`ne`, supported on Gemini 3.8 Live). Run local-speaker evaluation for Bengali and Nepali before enabling patient sessions in those languages; Bengali is currently tagged for Bangladesh locale in the model API.
 
 ## 6. Terraform state bucket and apply
 Create the state bucket:

@@ -88,7 +88,7 @@ Acceptance IDs (`MVP-01`…`MVP-12`) and section numbers (`§`) refer to the MVP
 - `AgentProposal` schema (§10) validated with Zod; unknown fields rejected; source refs checked; document text treated as data (prompt-injection safe).
 - `apps/voice`: `POST /v1/voice/sessions` issues single-use, case-bound ticket; WSS gateway to Live model; no API key in browser; supervised/labeled demo identity step; minimal context; interruption/backpressure; session cap below Cloud Run timeout; disconnect reconciles outstanding operations (§11).
 - Conversation script: AI disclosure, human option, identity, logistics, read-back of slot, "request sent" until confirmed. Medical question → stop, site-approved response, staff task (MVP-06).
-- Hindi + English only. Bengali gated on local-speaker testing.
+- Conversation language targets: English, Hindi, Bengali, and Nepali. Each language must pass local-speaker evaluation before activation for patient sessions; unsupported languages require human handoff.
 - Record model/prompt versions on every interaction.
 
 **Exit:** demo conversation books a sandbox slot for a "can't come during work hours" patient; medical-advice and invented-slot scenarios behave correctly.
@@ -132,7 +132,7 @@ Acceptance IDs (`MVP-01`…`MVP-12`) and section numbers (`§`) refer to the MVP
 - **Security & privacy (§19):** MFA, tenant-isolation tests on every endpoint, file allowlists/malware checks, redacted logs, audio recording off, Secret Manager + least-privilege service accounts, export/deletion workflow, retention defaults, incident runbook.
 - **Compliance review:** intended-use review against NMC Telemedicine Guidelines; DPDP notice/consent/withdrawal/grievance processes; Gemini/Google Cloud healthcare and age terms; per-processor data-location check (inference, telephony, messaging, logs, backups).
 - **Operations (§20):** monitoring dashboard (outbox age, queue delay, UNKNOWN bookings, unacknowledged handoffs, consent blocks, model errors, voice disconnects, cost/case), named on-call operator, per-tenant budgets + pause switch, backup/restore drill (RPO ≤24h, RTO ≤4h), load test (10 concurrent voice sessions, p95 API <500 ms, Live first response <2 s).
-- Bengali release only after local-speaker evaluation passes.
+- Bengali and Nepali release only after local-speaker evaluation passes for each language.
 
 **Exit:** pilot project deployed; security/compliance sign-off; restore drill done; `OUTREACH_ENABLED` flipped only with a named lab owner and staffed contact window.
 

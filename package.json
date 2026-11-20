@@ -17,6 +17,7 @@
     "check:models": "corepack pnpm --filter @careloop/scripts check-models",
     "eval:models": "python models/eval.py",
     "dev:models-api": "python models/intake_app.py",
+    "dev:conversation-api": "python models/conversation_api.py",
     "check": "pnpm format:check && pnpm typecheck && pnpm test",
     "test:emulator": "pnpm --filter @careloop/domain test:emulator"
   },

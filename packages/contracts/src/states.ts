@@ -62,5 +62,9 @@ export type ActionType = z.infer<typeof ActionType>;
 export const SupportedLanguage = z.enum(['hi-IN', 'en-IN']);
 export type SupportedLanguage = z.infer<typeof SupportedLanguage>;
 
+/** Voice session language hints supported by the Conversation agent's Live model. */
+export const SupportedVoiceLanguage = z.enum(['hi-IN', 'en-IN', 'bn-BD', 'ne']);
+export type SupportedVoiceLanguage = z.infer<typeof SupportedVoiceLanguage>;
+
 export const ContactChannel = z.enum(['BROWSER_VOICE', 'PSTN_VOICE', 'WHATSAPP', 'SMS']);
 export type ContactChannel = z.infer<typeof ContactChannel>;
