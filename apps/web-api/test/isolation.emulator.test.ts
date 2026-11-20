@@ -65,6 +65,8 @@ async function snapshotA() {
     booking: await read(tenantRecord(A, 'bookings', ids.bookingId!)),
     failed: await read(tenantRecord(A, 'failed_jobs', ids.jobId!)),
     patient: await read(tenantRecord(A, 'patients', 'pat_a')),
+    interaction: await read(tenantRecord(A, 'interactions', 'int_a_secret')),
+    pilot: await read(tenantRecord(A, 'pilot', 'config')),
   };
 }
 
@@ -219,6 +221,13 @@ beforeAll(async () => {
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   });
+  await db.doc(tenantRecord(A, 'interactions', 'int_a_secret')).set({
+    interactionId: 'int_a_secret',
+    caseId: 'CL-ISO-A',
+    createdAt: new Date().toISOString(),
+    reviewStatus: 'PENDING',
+    status: 'ENDED',
+  });
   await db.doc(tenantRecord(A, 'failed_jobs', 'job_iso_a')).set({
     jobId: 'job_iso_a',
     tenantId: A,
@@ -304,6 +313,21 @@ function bodyFor(route: string): unknown {
     '/v1/voice/sessions': { caseId: ids.caseId },
     '/v1/settings/outreach': { paused: true, reason: 'B pausing' },
     '/v1/patients/[id]/erasure': { reason: 'B erasing' },
+    '/v1/time-logs': { caseId: ids.caseId, minutes: 5, activity: 'CALL' },
+    '/v1/reviews/[id]': { outcome: 'OK', issues: [] },
+    '/v1/pilot/config': {
+      phase: 'BASELINE',
+      concurrentComparison: true,
+      interventionShare: 0.5,
+      supervisedReviewFirstN: 5,
+      costRates: {
+        voicePerMinuteInr: 1,
+        messageInr: 0,
+        modelPerCaseInr: 0,
+        directSupportPerMonthInr: 0,
+      },
+      pricing: { sitePerMonthInr: 2999, perEnrolledCaseInr: 25 },
+    },
     '/v1/intake/csv': {
       csv: 'patient_ref,action_type,action_text,due_date,source_authority,reference\next_ref_a_secret,CONSULTATION,x,2030-01-01,clinic,ORD-A\n',
     },
@@ -321,6 +345,7 @@ function paramsFor(route: string): Record<string, string> {
   if (route.includes('/bookings/[id]')) p.id = ids.bookingId!;
   if (route.includes('/consents/[id]')) p.id = 'consent_a';
   if (route.includes('/patients/[id]')) p.id = 'pat_a';
+  if (route.includes('/reviews/[id]')) p.id = 'int_a_secret';
   if (route.includes('/operations/[id]')) p.id = ids.operationId!;
   if (route.includes('/jobs/[id]')) p.id = ids.jobId!;
   if (route.includes('[action]')) p.action = 'acknowledge';
@@ -344,7 +369,12 @@ const OWN_TENANT_ROUTES = new Set([
   '/v1/intake/csv',
   '/v1/intake/pdf',
   '/v1/ops/metrics',
+  '/v1/reviews',
+  '/v1/pilot/config',
+  '/v1/pilot/report',
 ]);
+/** Same path, different meaning per method: the GET lists the caller's own lab; the POST targets a case. */
+const OWN_TENANT_GETS = new Set(['/v1/time-logs']);
 const NOT_STAFF = (r: string) =>
   r.startsWith('/v1/p/') || r.startsWith('/webhooks') || r.startsWith('/api/');
 const LAB_A_MARKERS = [
@@ -406,9 +436,15 @@ describe('tenant isolation sweep', () => {
         const text = await res.text();
         const leaked = LAB_A_MARKERS.filter((m) => text.includes(m));
         if (leaked.length) findings.push(`${method} ${route} leaked ${leaked.join(', ')}`);
-        if (!OWN_TENANT_ROUTES.has(route) && res.status < 400)
+        if (
+          !(OWN_TENANT_ROUTES.has(route) || (method === 'GET' && OWN_TENANT_GETS.has(route))) &&
+          res.status < 400
+        )
           findings.push(`${method} ${route} returned ${res.status} for a lab-A target`);
-        if (!OWN_TENANT_ROUTES.has(route) && ![403, 404].includes(res.status))
+        if (
+          !(OWN_TENANT_ROUTES.has(route) || (method === 'GET' && OWN_TENANT_GETS.has(route))) &&
+          ![403, 404].includes(res.status)
+        )
           findings.push(`${method} ${route} returned ${res.status} (expected 403/404)`);
       }
     }

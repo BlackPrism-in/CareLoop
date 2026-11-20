@@ -13,6 +13,7 @@ const NAV = [
   { href: '/bookings', label: 'Bookings' },
   { href: '/handoffs', label: 'Human queue' },
   { href: '/reports', label: 'Reports' },
+  { href: '/pilot', label: 'Pilot' },
   { href: '/settings', label: 'Settings' },
 ];
 

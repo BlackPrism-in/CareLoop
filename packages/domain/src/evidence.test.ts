@@ -22,6 +22,7 @@ const base = {
   bookedStartsAt: '2026-11-23T11:00:00.000Z',
   bookingRef: 'sbx_1',
   activeHandoffId: null,
+  pilotArm: null,
   workflowState: 'BOOKED',
   outreachDisposition: 'REACHED',
   handoffState: 'NONE',

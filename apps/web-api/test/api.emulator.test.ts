@@ -33,6 +33,11 @@ import { GET as exportCase } from '../app/v1/cases/[id]/export/route';
 import { POST as erase } from '../app/v1/patients/[id]/erasure/route';
 import { POST as csvIntake } from '../app/v1/intake/csv/route';
 import { POST as pdfIntake } from '../app/v1/intake/pdf/route';
+import { GET as getPilotConfig, POST as setPilotConfig } from '../app/v1/pilot/config/route';
+import { GET as pilotReport } from '../app/v1/pilot/report/route';
+import { POST as logTime } from '../app/v1/time-logs/route';
+import { GET as listReviews } from '../app/v1/reviews/route';
+import { POST as reviewCall } from '../app/v1/reviews/[id]/route';
 
 /**
  * Exercises the real route handlers against the Auth + Firestore emulators
@@ -1248,5 +1253,214 @@ describe('staff API on emulators', () => {
     // Text was extracted; with no Gemini credentials here the model step reports unavailable.
     expect(res.status).toBe(429);
     expect((await res.json()).message).toBe('MODEL_UNAVAILABLE');
+  });
+
+  it('Phase 8: pilot setup is owner-only and forward-only; groups block contact; time, reviews and the report work', async () => {
+    const cfg = (phase: string, over: Record<string, unknown> = {}) => ({
+      phase,
+      concurrentComparison: true,
+      interventionShare: 0.5,
+      supervisedReviewFirstN: 2,
+      costRates: {
+        voicePerMinuteInr: 1.5,
+        messageInr: 0.4,
+        modelPerCaseInr: 0.8,
+        directSupportPerMonthInr: 1500,
+      },
+      pricing: { sitePerMonthInr: 2999, perEnrolledCaseInr: 25 },
+      ...over,
+    });
+    expect(
+      (await pilotReport(req('/v1/pilot/report', { as: 'staff_demo_owner' }), noParams)).status,
+    ).toBe(422); // not started
+    expect(
+      (
+        await setPilotConfig(
+          req('/v1/pilot/config', {
+            as: 'staff_demo_reviewer',
+            method: 'POST',
+            body: cfg('BASELINE'),
+          }),
+          noParams,
+        )
+      ).status,
+    ).toBe(403);
+    const started = await (
+      await setPilotConfig(
+        req('/v1/pilot/config', { as: 'staff_demo_owner', method: 'POST', body: cfg('BASELINE') }),
+        noParams,
+      )
+    ).json();
+    expect(started.config.phase).toBe('BASELINE');
+    expect(JSON.stringify(started)).not.toContain('allocationSalt');
+    expect(
+      JSON.stringify(
+        await (
+          await getPilotConfig(req('/v1/pilot/config', { as: 'staff_demo_01' }), noParams)
+        ).json(),
+      ),
+    ).not.toContain('allocationSalt');
+
+    // Baseline: tracked, approved, never contacted by CareLoop; staff time is logged for the comparison.
+    const base = await readyCase('ORD-PILOT-B');
+    const detail = await (
+      await getCase(req(`/v1/cases/${base.id}`, { as: 'staff_demo_01' }), params({ id: base.id }))
+    ).json();
+    expect(detail.case.pilotArm).toBe('BASELINE');
+    const refused = await contactRequest(
+      req(`/v1/cases/${base.id}/contact-requests`, {
+        as: 'staff_demo_01',
+        method: 'POST',
+        key: 'pb-c',
+        body: { expectedVersion: base.v, channel: 'BROWSER_VOICE' },
+      }),
+      params({ id: base.id }),
+    );
+    expect((await refused.json()).message).toBe('NOT_IN_INTERVENTION_ARM');
+    expect(
+      (
+        await createLink(
+          req(`/v1/cases/${base.id}/patient-links`, {
+            as: 'staff_demo_01',
+            method: 'POST',
+            body: {},
+          }),
+          params({ id: base.id }),
+        )
+      ).status,
+    ).toBe(422);
+    const logged = await logTime(
+      req('/v1/time-logs', {
+        as: 'staff_demo_01',
+        method: 'POST',
+        key: 'tl-1',
+        body: { caseId: base.id, minutes: 12, activity: 'CALL' },
+      }),
+      noParams,
+    );
+    expect((await logged.json()).pilotArm).toBe('BASELINE');
+    await logTime(
+      req('/v1/time-logs', {
+        as: 'staff_demo_01',
+        method: 'POST',
+        key: 'tl-1',
+        body: { caseId: base.id, minutes: 12, activity: 'CALL' },
+      }),
+      noParams,
+    ); // retry, not double-counted
+
+    // Intervention without a concurrent comparison: new approvals are CareLoop cases, and calls need review.
+    expect(
+      (
+        await setPilotConfig(
+          req('/v1/pilot/config', {
+            as: 'staff_demo_owner',
+            method: 'POST',
+            body: cfg('INTERVENTION', { concurrentComparison: false }),
+          }),
+          noParams,
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await setPilotConfig(
+          req('/v1/pilot/config', {
+            as: 'staff_demo_owner',
+            method: 'POST',
+            body: cfg('BASELINE'),
+          }),
+          noParams,
+        )
+      ).status,
+    ).toBe(422); // no going back
+    expect(
+      (
+        await setPilotConfig(
+          req('/v1/pilot/config', {
+            as: 'staff_demo_owner',
+            method: 'POST',
+            body: cfg('INTERVENTION', { concurrentComparison: true }),
+          }),
+          noParams,
+        )
+      ).status,
+    ).toBe(422); // allocation locked
+    const iv = await readyCase('ORD-PILOT-I', 'consent_demo_01', 'pat_demo_01', true);
+    const vs = await (
+      await voiceSession(
+        req('/v1/voice/sessions', { as: 'staff_demo_01', method: 'POST', body: { caseId: iv.id } }),
+        noParams,
+      )
+    ).json();
+    await firestore().doc(`tenants/${T}/interactions/${vs.interactionId}`).update({
+      status: 'ENDED',
+      identityAssurance: 'SIMULATED',
+      audioSeconds: 90,
+      disposition: 'BOOKED',
+    });
+    const queue = await (
+      await listReviews(req('/v1/reviews', { as: 'staff_demo_reviewer' }), noParams)
+    ).json();
+    expect(queue.pending.map((x: { interactionId: string }) => x.interactionId)).toContain(
+      vs.interactionId,
+    );
+    expect(
+      (
+        await reviewCall(
+          req(`/v1/reviews/${vs.interactionId}`, {
+            as: 'staff_demo_01',
+            method: 'POST',
+            body: { outcome: 'OK', issues: [] },
+          }),
+          params({ id: vs.interactionId }),
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await reviewCall(
+          req(`/v1/reviews/${vs.interactionId}`, {
+            as: 'staff_demo_reviewer',
+            method: 'POST',
+            body: { outcome: 'ISSUE', issues: ['TONE'], note: 'Too fast' },
+          }),
+          params({ id: vs.interactionId }),
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await reviewCall(
+          req(`/v1/reviews/${vs.interactionId}`, {
+            as: 'staff_demo_reviewer',
+            method: 'POST',
+            body: { outcome: 'OK', issues: [] },
+          }),
+          params({ id: vs.interactionId }),
+        )
+      ).status,
+    ).toBe(409);
+
+    const report = await (
+      await pilotReport(req('/v1/pilot/report', { as: 'staff_demo_auditor' }), noParams)
+    ).json();
+    expect(report.arms.BASELINE.enrolled).toBe(1);
+    expect(report.arms.INTERVENTION.enrolled).toBe(1);
+    expect(report.arms.BASELINE.staffMinutes).toBe(12);
+    expect(report.reviews).toMatchObject({ reviewed: 1, withIssues: 1, issues: { TONE: 1 } });
+    expect(report.integrity).toEqual({
+      contactOutsideIntervention: 0,
+      duplicateLiveBookings: 0,
+      completionWithoutIndependentEvidence: 0,
+    });
+    expect(report.cost.voiceMinutes).toBe(1.5);
+    expect(
+      report.gates.find((g: { name: string }) => g.name.startsWith('Reliability')).status,
+    ).toBe('MET');
+    expect(
+      report.gates.find((g: { name: string }) => g.name.startsWith('Incremental')).status,
+    ).toBe('NOT_ENOUGH_DATA');
+    expect(JSON.stringify(report)).not.toContain('allocationSalt');
   });
 });

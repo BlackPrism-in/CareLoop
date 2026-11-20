@@ -7,6 +7,7 @@ import { BookingPanel } from '@/components/booking-panel';
 import { Timeline } from '@/components/timeline';
 import { VoicePanel } from '@/components/voice-panel';
 import { CaseActions } from '@/components/case-actions';
+import { TimeLog } from '@/components/time-log';
 import { EvidencePanel } from '@/components/evidence-panel';
 import { HandoffCard } from '@/components/handoff-card';
 import { Button, Card, Field, inputClass, LoadError, Notice, Skeleton } from '@/components/ui';
@@ -75,6 +76,16 @@ export default function CaseWorkspace({ params }: { params: Promise<{ id: string
           <PausedBadge reason={c.automationPausedReason} />
           {isOverdue(c.dueAt, c.workflowState) && <OverdueBadge />}
           <span className="text-[var(--muted)]">Outreach: {OUTREACH[c.outreachDisposition]}</span>
+          {c.pilotArm && (
+            <span className="rounded border border-[var(--line)] px-1.5 py-0.5 text-xs">
+              Pilot:{' '}
+              {c.pilotArm === 'INTERVENTION'
+                ? 'CareLoop group'
+                : c.pilotArm === 'USUAL_CARE'
+                  ? 'usual care — no CareLoop contact'
+                  : 'baseline — no CareLoop contact'}
+            </span>
+          )}
           <span className="text-[var(--muted)]">
             · Owner: {data.owner?.displayName ?? c.ownerId}
           </span>
@@ -112,6 +123,8 @@ export default function CaseWorkspace({ params }: { params: Promise<{ id: string
           }}
         />
       )}
+
+      <TimeLog caseId={c.caseId} />
 
       <CaseActions
         detail={data}

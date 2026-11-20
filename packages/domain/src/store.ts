@@ -1,4 +1,5 @@
 import type {
+  PilotConfig,
   UsageMonth,
   Case,
   Consent,
@@ -75,6 +76,7 @@ export interface Tx {
   getEvidence(evidenceId: string): Promise<EvidenceDoc | null>;
   getHandoff(handoffId: string): Promise<HandoffDoc | null>;
   getUsage(month: string): Promise<UsageMonth | null>;
+  getPilotConfig(): Promise<PilotConfig | null>;
 
   putCase(c: Case): void;
   /** Fails the transaction if the fingerprint is already indexed. */

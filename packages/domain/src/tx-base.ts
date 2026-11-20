@@ -1,4 +1,5 @@
 import type {
+  PilotConfig,
   UsageMonth,
   Case,
   Consent,
@@ -47,6 +48,7 @@ export class BufferedTx implements Tx {
   getEvidence = (id: string) => this.rec<EvidenceDoc>('evidence', id);
   getHandoff = (id: string) => this.rec<HandoffDoc>('handoffs', id);
   getUsage = (month: string) => this.rec<UsageMonth>('usage', month);
+  getPilotConfig = () => this.rec<PilotConfig>('pilot', 'config');
   getCaseIdByFingerprint = async (fp: string) =>
     (await this.rec<{ caseId: string }>('case_fingerprints', fp))?.caseId ?? null;
 

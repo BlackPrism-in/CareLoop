@@ -123,6 +123,8 @@ export const Case = z.strictObject({
   bookingRef: z.string().nullable(),
   /** The open human handoff record for this case, if any. */
   activeHandoffId: z.string().nullable(),
+  /** Pilot group, fixed at first approval while a pilot runs (Blueprint p.11). Null outside a pilot. */
+  pilotArm: z.enum(['BASELINE', 'INTERVENTION', 'USUAL_CARE']).nullable(),
   workflowState: WorkflowState,
   outreachDisposition: OutreachDisposition,
   handoffState: HandoffState,
@@ -157,3 +159,39 @@ export const Slot = z.strictObject({
   reserved: z.number().int().nonnegative(),
 });
 export type Slot = z.infer<typeof Slot>;
+
+export const PilotArm = z.enum(['BASELINE', 'INTERVENTION', 'USUAL_CARE']);
+export type PilotArm = z.infer<typeof PilotArm>;
+
+/**
+ * tenants/{t}/pilot/config. Supervised pilot protocol (Blueprint p.11):
+ * BASELINE weeks observe the usual process (no automated contact); in
+ * INTERVENTION weeks new approvals are allocated to CareLoop or usual care.
+ */
+export const PilotConfig = z.strictObject({
+  phase: z.enum(['NOT_STARTED', 'BASELINE', 'INTERVENTION', 'ENDED']),
+  baselineStartedAt: z.iso.datetime().nullable(),
+  interventionStartedAt: z.iso.datetime().nullable(),
+  endedAt: z.iso.datetime().nullable(),
+  /** Concurrent usual-care comparison during the intervention period. */
+  concurrentComparison: z.boolean(),
+  /** Share of new approvals allocated to CareLoop when comparing concurrently. */
+  interventionShare: z.number().min(0.1).max(0.9),
+  /** Server-side secret so staff cannot predict or steer allocation. Never sent to browsers. */
+  allocationSalt: z.string().min(16),
+  /** The first N live calls must be reviewed under the protocol. */
+  supervisedReviewFirstN: z.number().int().min(0).max(1000),
+  costRates: z.strictObject({
+    voicePerMinuteInr: z.number().min(0),
+    messageInr: z.number().min(0),
+    modelPerCaseInr: z.number().min(0),
+    directSupportPerMonthInr: z.number().min(0),
+  }),
+  pricing: z.strictObject({
+    sitePerMonthInr: z.number().min(0),
+    perEnrolledCaseInr: z.number().min(0),
+  }),
+  updatedBy: z.string(),
+  updatedAt: z.iso.datetime(),
+});
+export type PilotConfig = z.infer<typeof PilotConfig>;

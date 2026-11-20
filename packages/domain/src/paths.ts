@@ -34,6 +34,8 @@ export const TENANT_COLLECTIONS = [
   'notifications',
   'audit',
   'usage',
+  'pilot',
+  'time_logs',
 ] as const;
 export type TenantCollection = (typeof TENANT_COLLECTIONS)[number];
 

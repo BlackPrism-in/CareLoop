@@ -154,3 +154,49 @@ export const CsvIntakeBody = z.strictObject({
 
 /** Base64 PDF, ≤ 5 MB decoded. The file is processed in memory and not stored. */
 export const PdfIntakeBody = z.strictObject({ pdfBase64: z.string().min(10).max(7_000_000) });
+
+export const TimeLogBody = z.strictObject({
+  caseId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,128}$/)
+    .optional(),
+  minutes: z.number().int().min(1).max(240),
+  activity: z.enum(['CALL', 'BOOKING', 'HANDOFF', 'REVIEW', 'EVIDENCE', 'INTAKE', 'OTHER']),
+  note: z.string().trim().max(200).optional(),
+});
+
+export const ReviewBody = z.strictObject({
+  outcome: z.enum(['OK', 'ISSUE']),
+  issues: z
+    .array(
+      z.enum([
+        'UNSUPPORTED_CLAIM',
+        'MEDICAL_CONTENT',
+        'IDENTITY',
+        'LANGUAGE',
+        'TONE',
+        'TOOL_MISUSE',
+        'OTHER',
+      ]),
+    )
+    .max(7)
+    .default([]),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const PilotConfigBody = z.strictObject({
+  phase: z.enum(['NOT_STARTED', 'BASELINE', 'INTERVENTION', 'ENDED']),
+  concurrentComparison: z.boolean(),
+  interventionShare: z.number().min(0.1).max(0.9),
+  supervisedReviewFirstN: z.number().int().min(0).max(1000),
+  costRates: z.strictObject({
+    voicePerMinuteInr: z.number().min(0).max(100),
+    messageInr: z.number().min(0).max(100),
+    modelPerCaseInr: z.number().min(0).max(1000),
+    directSupportPerMonthInr: z.number().min(0).max(1_000_000),
+  }),
+  pricing: z.strictObject({
+    sitePerMonthInr: z.number().min(0),
+    perEnrolledCaseInr: z.number().min(0),
+  }),
+});

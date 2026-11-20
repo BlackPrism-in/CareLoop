@@ -1,5 +1,5 @@
 import { loadConfig } from '@careloop/contracts';
-import { createPatientLink } from '@careloop/domain';
+import { automatedContactAllowed, createPatientLink } from '@careloop/domain';
 import { loadCase } from '@/server/case-helpers';
 import { HttpError } from '@/server/errors';
 import { firestore } from '@/server/firebase';
@@ -19,6 +19,9 @@ export const POST = staffRoute<{ id: string }>(async ({ session, params }) => {
   const c = await loadCase(session.ctx.tenantId, params.id);
   if (['DRAFT', 'CANCELLED', 'COMPLETED_VERIFIED'].includes(c.workflowState))
     throw new HttpError('DOMAIN_GUARD_FAILED', 'CASE_NOT_OPEN_FOR_PATIENT');
+  // Patient links are CareLoop outreach: baseline and usual-care cases follow the lab's normal process.
+  if (!automatedContactAllowed(c.pilotArm))
+    throw new HttpError('DOMAIN_GUARD_FAILED', 'NOT_IN_INTERVENTION_ARM');
   const tenant = (await queries().lookups(session.ctx.tenantId)).tenant;
   const { token, code, expiresAt } = await createPatientLink(firestore(), {
     tenantId: session.ctx.tenantId,

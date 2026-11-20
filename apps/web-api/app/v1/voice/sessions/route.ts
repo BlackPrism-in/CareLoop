@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { loadConfig } from '@careloop/contracts';
+import { loadConfig, type PilotConfig } from '@careloop/contracts';
 import { CONVERSATION_PROMPT } from '@careloop/ai';
-import { issueVoiceTicket, tenantRecord } from '@careloop/domain';
+import { issueVoiceTicket, tenantCollection, tenantRecord } from '@careloop/domain';
 import { HttpError } from '@/server/errors';
 import { firestore } from '@/server/firebase';
 import { jsonBody, staffRoute } from '@/server/handler';
@@ -34,6 +34,23 @@ export const POST = staffRoute(async ({ req, session }) => {
     throw new HttpError('DOMAIN_GUARD_FAILED', 'AUDIO_BUDGET_EXHAUSTED');
 
   const interactionId = `int_${randomUUID().replaceAll('-', '').slice(0, 20)}`;
+  // Pilot protocol: the first N calls of the intervention period need a supervised review.
+  const pilot = (
+    await firestore()
+      .doc(tenantRecord(session.ctx.tenantId, 'pilot', 'config'))
+      .get()
+  ).data() as PilotConfig | undefined;
+  let reviewStatus: 'PENDING' | 'NOT_REQUIRED' = 'NOT_REQUIRED';
+  if (pilot?.phase === 'INTERVENTION') {
+    const already = (
+      await firestore()
+        .collection(tenantCollection(session.ctx.tenantId, 'interactions'))
+        .where('reviewStatus', 'in', ['PENDING', 'REVIEWED'])
+        .count()
+        .get()
+    ).data().count;
+    if (already < pilot.supervisedReviewFirstN) reviewStatus = 'PENDING';
+  }
   await firestore()
     .doc(tenantRecord(session.ctx.tenantId, 'interactions', interactionId))
     .create({
@@ -47,6 +64,8 @@ export const POST = staffRoute(async ({ req, session }) => {
       model: cfg.LIVE_MODEL_ID,
       promptVersion: CONVERSATION_PROMPT.version,
       simulation: tenant?.simulation ?? false,
+      reviewStatus,
+      pilotArm: c.pilotArm,
     });
   const { ticket, expiresAt } = await issueVoiceTicket(firestore(), {
     tenantId: session.ctx.tenantId,

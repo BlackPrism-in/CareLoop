@@ -25,6 +25,7 @@ const base = {
   bookedStartsAt: null,
   bookingRef: null,
   activeHandoffId: null,
+  pilotArm: null,
   workflowState: 'READY',
   outreachDisposition: 'NOT_STARTED',
   handoffState: 'NONE',

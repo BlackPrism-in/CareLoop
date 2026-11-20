@@ -18,6 +18,7 @@ import {
   type MaterialField,
 } from './approval';
 import { withinContactWindow } from './contact-window';
+import { automatedContactAllowed } from './pilot';
 import { guardFailed } from './errors';
 
 /**
@@ -119,6 +120,8 @@ export function editDraft(c: Case, edit: DraftEdit): Transition {
 }
 
 export interface ApproveInput {
+  /** Pilot group to record if the case has none yet (fixed at first approval). */
+  pilotArm?: Case['pilotArm'];
   reviewerId: string;
   sourceAuthorityRef: string;
   checkedFields: readonly string[];
@@ -156,9 +159,11 @@ export function approve(
       approvedAt: input.now.toISOString(),
       approvedBy: input.reviewerId,
       automationPausedReason: pausedForOptOut ? 'CONSENT' : null,
+      ...(c.pilotArm === null && input.pilotArm ? { pilotArm: input.pilotArm } : {}),
     },
     eventType: 'CASE_APPROVED',
     payload: {
+      pilotArm: c.pilotArm ?? input.pilotArm ?? null,
       approvalRevision: revision,
       approvalHash: hash,
       sourceAuthorityRef: input.sourceAuthorityRef,
@@ -196,6 +201,8 @@ export function dispatchContact(c: Case, f: DispatchFacts): Transition {
   // browser-voice session reaches no one, so the demo can run with it off.
   const simulatedOnly = f.tenant.simulation && f.channel === 'BROWSER_VOICE';
   if (!f.outreachEnabled && !simulatedOnly) throw guardFailed('OUTREACH_DISABLED');
+  // Pilot: baseline and usual-care cases follow the lab's normal process, never CareLoop contact.
+  if (!automatedContactAllowed(c.pilotArm)) throw guardFailed('NOT_IN_INTERVENTION_ARM');
   if (f.tenant.outreachPaused) throw guardFailed('SITE_PAUSED');
   if (c.automationPausedReason !== null)
     throw guardFailed(`AUTOMATION_PAUSED_${c.automationPausedReason}`);

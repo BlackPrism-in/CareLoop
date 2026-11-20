@@ -83,6 +83,11 @@ const REASONS: Record<string, string> = {
   OUTREACH_DISABLED: 'Automated outreach is switched off for this environment.',
   OUTSIDE_CONTACT_WINDOW: "It's outside the lab's contact hours.",
   CONTACT_ATTEMPTS_EXHAUSTED: 'The contact attempt budget for this case is used up.',
+  NOT_IN_INTERVENTION_ARM:
+    "This case is in the pilot's comparison group: the lab's usual process applies, not CareLoop contact.",
+  PILOT_PHASE_CANNOT_GO_BACK: 'Pilot phases only move forward.',
+  ALLOCATION_LOCKED_DURING_INTERVENTION:
+    'Allocation settings are locked once the intervention has started.',
   PATIENT_HAS_OPEN_CASES: 'This patient still has an open follow-up. Close or cancel it first.',
   LAB_MONTHLY_CONTACT_LIMIT_REACHED: "The lab's monthly contact allowance is used up.",
   LAB_MONTHLY_VOICE_LIMIT_REACHED: "The lab's monthly voice allowance is used up.",

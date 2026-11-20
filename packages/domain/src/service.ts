@@ -13,6 +13,7 @@ import { hashPayload, sha256 } from './hashing';
 import type { CommandResult, OperationRecord, OutboxRecord, Store, Tx } from './store';
 import * as T from './transitions';
 import { matchEvidence } from './evidence';
+import { allocateArm } from './pilot';
 import type { EvidenceDoc, EvidenceEventType, HandoffDoc } from './records';
 
 export interface ServiceConfig {
@@ -416,6 +417,7 @@ export class CaseCommands {
         bookedStartsAt: null,
         bookingRef: null,
         activeHandoffId: null,
+        pilotArm: null,
         workflowState: 'DRAFT',
         outreachDisposition: 'NOT_STARTED',
         handoffState: 'NONE',
@@ -476,10 +478,12 @@ export class CaseCommands {
       const consent = await this.load(tx.getConsent(c.consentId), 'CONSENT');
       const patient = await this.load(tx.getPatient(c.patientId), 'PATIENT');
       const owner = await tx.getMember(c.ownerId);
+      const pilot = await tx.getPilotConfig();
       return T.approve(
         c,
         { consent, patient, ownerIsActiveMember: owner?.status === 'ACTIVE' },
         {
+          pilotArm: allocateArm(pilot, c.caseId),
           reviewerId: ctx.actorId,
           sourceAuthorityRef: req.input.sourceAuthorityRef,
           checkedFields: req.input.checkedFields,

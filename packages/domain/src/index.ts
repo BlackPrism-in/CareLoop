@@ -18,3 +18,5 @@ export * from './evidence';
 export * from './patient-links';
 export * from './consent';
 export * from './csv-intake';
+export * from './pilot';
+export * from './pilot-report';

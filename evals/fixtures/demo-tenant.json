@@ -209,7 +209,8 @@
       "version": 1,
       "createdBy": "staff_demo_01",
       "createdAt": "2026-11-20T03:40:00Z",
-      "updatedAt": "2026-11-20T03:40:00Z"
+      "updatedAt": "2026-11-20T03:40:00Z",
+      "pilotArm": null
     },
     {
       "caseId": "CL-1043",
@@ -241,7 +242,8 @@
       "version": 1,
       "createdBy": "staff_demo_01",
       "createdAt": "2026-11-20T03:45:00Z",
-      "updatedAt": "2026-11-20T03:45:00Z"
+      "updatedAt": "2026-11-20T03:45:00Z",
+      "pilotArm": null
     },
     {
       "caseId": "CL-1044",
@@ -273,7 +275,8 @@
       "version": 1,
       "createdBy": "staff_demo_01",
       "createdAt": "2026-11-20T03:50:00Z",
-      "updatedAt": "2026-11-20T03:50:00Z"
+      "updatedAt": "2026-11-20T03:50:00Z",
+      "pilotArm": null
     },
     {
       "caseId": "CL-1045",
@@ -305,7 +308,8 @@
       "version": 1,
       "createdBy": "staff_demo_01",
       "createdAt": "2026-11-20T03:55:00Z",
-      "updatedAt": "2026-11-20T03:55:00Z"
+      "updatedAt": "2026-11-20T03:55:00Z",
+      "pilotArm": null
     }
   ],
   "slots": [

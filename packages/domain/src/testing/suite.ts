@@ -404,6 +404,48 @@ export function commandSuite(name: string, backend: () => TestBackend) {
       ).toBe(40);
     });
 
+    it('pilot: baseline and usual-care cases are tracked but never contacted by CareLoop', async () => {
+      const config = {
+        phase: 'BASELINE',
+        baselineStartedAt: null,
+        interventionStartedAt: null,
+        endedAt: null,
+        concurrentComparison: true,
+        interventionShare: 0.5,
+        allocationSalt: 'test-salt-0123456789',
+        supervisedReviewFirstN: 10,
+        costRates: {
+          voicePerMinuteInr: 1,
+          messageInr: 0,
+          modelPerCaseInr: 0,
+          directSupportPerMonthInr: 0,
+        },
+        pricing: { sitePerMonthInr: 2999, perEnrolledCaseInr: 25 },
+        updatedBy: 'u',
+        updatedAt: '2026-11-20T00:00:00Z',
+      };
+      await b.seed(tenantRecord(T1, 'pilot', 'config'), config);
+      await d.create();
+      const r = d.track(await d.approve());
+      expect((await getCase())?.pilotArm).toBe('BASELINE');
+      expect(r.workflowState).toBe('READY');
+      await rejects(d.dispatch(), 'NOT_IN_INTERVENTION_ARM');
+      // The group is fixed at first approval even if the pilot moves on.
+      await b.seed(tenantRecord(T1, 'pilot', 'config'), {
+        ...config,
+        phase: 'INTERVENTION',
+        concurrentComparison: false,
+      });
+      d.track(await svc.editDraft(coordinator, d.req({ actionText: 'changed' })));
+      await d.approve();
+      expect((await getCase())?.pilotArm).toBe('BASELINE');
+      const d2 = new Driver(svc, 'CL-2');
+      await d2.create({ sourceId: 's2' });
+      await d2.approve();
+      expect((await getCase('CL-2'))?.pilotArm).toBe('INTERVENTION');
+      await d2.dispatch();
+    });
+
     // ---- MVP-04/05 booking ---------------------------------------------------
 
     it('MVP-04: a booking request needs explicit patient confirmation of the slot', async () => {
