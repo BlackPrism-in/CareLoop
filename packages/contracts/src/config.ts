@@ -32,6 +32,8 @@ export const AppConfig = z.object({
   MESSAGING_ADAPTER: z.enum(['simulated', 'provider']).default('simulated'),
   /** Master kill switch for automated patient contact. Must stay false outside a reviewed pilot. */
   OUTREACH_ENABLED: bool,
+  /** Staff must sign in with a second factor (TOTP). Required in the pilot. */
+  REQUIRE_STAFF_MFA: bool,
   MAX_CONTACT_ATTEMPTS: z.coerce.number().int().min(0).max(5).default(2),
   MAX_CASE_AUDIO_SECONDS: z.coerce.number().int().min(0).max(600).default(180),
   CLOUD_TASKS_QUEUE: z.string().min(1).default('careloop-jobs'),
@@ -86,6 +88,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const cfg = parsed.data;
   if (cfg.TASK_QUEUE_MODE === 'cloud-tasks' && !cfg.TASKS_INVOKER_EMAIL) {
     throw new Error('TASKS_INVOKER_EMAIL is required when TASK_QUEUE_MODE=cloud-tasks');
+  }
+  if (cfg.APP_ENV === 'pilot' && !cfg.REQUIRE_STAFF_MFA) {
+    throw new Error('REQUIRE_STAFF_MFA=true is mandatory when APP_ENV=pilot');
   }
   if (cfg.OUTREACH_ENABLED && cfg.APP_ENV !== 'pilot') {
     throw new Error('OUTREACH_ENABLED=true is only allowed when APP_ENV=pilot');

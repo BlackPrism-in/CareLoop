@@ -15,7 +15,7 @@ export interface Me {
 interface AuthState {
   user: User | null;
   me: Me | null;
-  status: 'loading' | 'signed-out' | 'ready' | 'no-access';
+  status: 'loading' | 'signed-out' | 'ready' | 'no-access' | 'mfa-enroll';
   signOut: () => Promise<void>;
   hasRole: (...roles: string[]) => boolean;
 }

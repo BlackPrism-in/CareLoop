@@ -30,8 +30,22 @@ export const Tenant = z.strictObject({
   timeZone: z.string().min(1),
   outreachPaused: z.boolean(),
   simulation: z.boolean(),
+  /** Contracted monthly allowances (Blueprint p.10). Absent = no lab-level cap. */
+  limits: z
+    .strictObject({
+      monthlyContactAttempts: z.number().int().positive(),
+      monthlyVoiceSeconds: z.number().int().positive(),
+    })
+    .optional(),
 });
 export type Tenant = z.infer<typeof Tenant>;
+
+/** tenants/{t}/usage/{YYYY-MM} in the lab's time zone. */
+export interface UsageMonth {
+  month: string;
+  contactAttempts: number;
+  voiceSeconds: number;
+}
 
 export const Site = z.strictObject({
   siteId: id,

@@ -107,7 +107,9 @@ export function createVoiceServer(deps: GatewayDeps) {
     });
     ws.on('close', () => {
       clearTimeout(authTimer);
-      void controller?.end('CLIENT_DISCONNECTED');
+      controller
+        ?.end('CLIENT_DISCONNECTED')
+        .catch((e: Error) => log.error('voice end failed', { correlationId, error: e.message }));
     });
   }
 
@@ -191,6 +193,10 @@ function friendly(reason: string): string {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const log = createLogger('careloop-voice');
+  // Last-resort guard: log instead of crashing, which would drop every live call on this instance.
+  process.on('unhandledRejection', (e) =>
+    log.error('unhandled rejection', { error: e instanceof Error ? e.message : String(e) }),
+  );
   const cfg = loadConfig();
   if (cfg.VOICE_ADAPTER !== 'browser') throw new Error('Only VOICE_ADAPTER=browser is implemented');
   const app = getApps()[0] ?? initializeApp({ projectId: cfg.GOOGLE_CLOUD_PROJECT });

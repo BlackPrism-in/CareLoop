@@ -376,6 +376,34 @@ export function commandSuite(name: string, backend: () => TestBackend) {
       );
     });
 
+    it('a lab over its contracted monthly allowance cannot place more contact attempts', async () => {
+      const tenantPath = tenantDoc(T1);
+      const tenant = (await b.read<Record<string, unknown>>(tenantPath))!;
+      await b.seed(tenantPath, {
+        ...tenant,
+        limits: { monthlyContactAttempts: 1, monthlyVoiceSeconds: 600 },
+      });
+      await d.create();
+      await d.approve();
+      await d.dispatch();
+      const usage = await b.read<{ contactAttempts: number }>(tenantRecord(T1, 'usage', '2026-11'));
+      expect(usage?.contactAttempts).toBe(1);
+      const d2 = new Driver(svc, 'CL-2');
+      await d2.create({ sourceId: 's2' });
+      await d2.approve();
+      await rejects(d2.dispatch(), 'LAB_MONTHLY_CONTACT_LIMIT_REACHED');
+      d.track(
+        await svc.recordInteractionEnded(
+          SYSTEM,
+          d.req({ interactionId: 'i', audioSeconds: 40, outcome: 'REACHED' as const }),
+        ),
+      );
+      expect(
+        (await b.read<{ voiceSeconds: number }>(tenantRecord(T1, 'usage', '2026-11')))
+          ?.voiceSeconds,
+      ).toBe(40);
+    });
+
     // ---- MVP-04/05 booking ---------------------------------------------------
 
     it('MVP-04: a booking request needs explicit patient confirmation of the slot', async () => {

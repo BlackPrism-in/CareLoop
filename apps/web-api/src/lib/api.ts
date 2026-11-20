@@ -83,6 +83,9 @@ const REASONS: Record<string, string> = {
   OUTREACH_DISABLED: 'Automated outreach is switched off for this environment.',
   OUTSIDE_CONTACT_WINDOW: "It's outside the lab's contact hours.",
   CONTACT_ATTEMPTS_EXHAUSTED: 'The contact attempt budget for this case is used up.',
+  PATIENT_HAS_OPEN_CASES: 'This patient still has an open follow-up. Close or cancel it first.',
+  LAB_MONTHLY_CONTACT_LIMIT_REACHED: "The lab's monthly contact allowance is used up.",
+  LAB_MONTHLY_VOICE_LIMIT_REACHED: "The lab's monthly voice allowance is used up.",
   MODEL_UNAVAILABLE:
     'The AI model could not be reached. Fill in the form by hand, or check the Gemini configuration.',
   CASE_NOT_IN_CONTACT: 'Start contact first.',

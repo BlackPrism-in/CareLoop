@@ -306,4 +306,22 @@ describe('provider webhooks, evidence and time sweeps (Firestore emulator)', () 
     expect((await db.doc(tenantRecord(T1, 'slots', 'slot_2')).get()).data()!.reserved).toBe(0);
     expect((await db.doc(tenantDoc(T1)).get()).exists).toBe(true);
   });
+
+  it('retention: removes expired credentials and old operational records, keeps case evidence', async () => {
+    const old = '2026-09-01T00:00:00.000Z';
+    await db.doc('voice_tickets/old').set({ expiresAt: old });
+    await db.doc('patient_sessions/old').set({ expiresAt: old });
+    await db.doc('patient_links/live').set({ expiresAt: '2027-01-01T00:00:00.000Z' });
+    await db.doc(tenantRecord(T1, 'notifications', 'old')).set({ createdAt: old });
+    await db.doc(tenantRecord(T1, 'inbox', 'old')).set({ receivedAt: old });
+    const evidenceBefore = (await db.collection(tenantCollection(T1, 'evidence')).get()).size;
+    const n = await new TimeSweeps(db, commands, log, { clock }).retention();
+    expect(n).toBeGreaterThanOrEqual(4);
+    expect((await db.doc('voice_tickets/old').get()).exists).toBe(false);
+    expect((await db.doc('patient_sessions/old').get()).exists).toBe(false);
+    expect((await db.doc('patient_links/live').get()).exists).toBe(true);
+    expect((await db.doc(tenantRecord(T1, 'inbox', 'old')).get()).exists).toBe(false);
+    expect((await db.collection(tenantCollection(T1, 'evidence')).get()).size).toBe(evidenceBefore);
+    expect((await getCase()).workflowState).toBe('BOOKED');
+  });
 });

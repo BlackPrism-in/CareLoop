@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useAuth } from './auth-provider';
+import { ExportButton } from './export-button';
 import { Button, Field, inputClass, Notice } from './ui';
 import { api, describeError } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
@@ -60,7 +61,7 @@ export function CaseActions({
     open && hasRole('REVIEWER', 'OWNER') && (['cancel', 'Cancel follow-up…'] as const),
     !open && hasRole('REVIEWER', 'VERIFIER', 'OWNER') && (['reopen', 'Reopen…'] as const),
   ].filter(Boolean) as (readonly [Mode, string])[];
-  if (buttons.length === 0) return null;
+  if (buttons.length === 0 && !hasRole('OWNER', 'AUDITOR')) return null;
 
   return (
     <div className="space-y-2">
@@ -78,6 +79,7 @@ export function CaseActions({
             {label}
           </Button>
         ))}
+        <ExportButton caseId={c.caseId} />
       </div>
       {mode === 'link' && (
         <div className="space-y-2 rounded-md border border-[var(--line)] p-3 text-sm">

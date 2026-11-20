@@ -1,4 +1,5 @@
 import type {
+  UsageMonth,
   Case,
   Consent,
   EventEnvelope,
@@ -73,6 +74,7 @@ export interface Tx {
   getCaseIdByFingerprint(fingerprint: string): Promise<string | null>;
   getEvidence(evidenceId: string): Promise<EvidenceDoc | null>;
   getHandoff(handoffId: string): Promise<HandoffDoc | null>;
+  getUsage(month: string): Promise<UsageMonth | null>;
 
   putCase(c: Case): void;
   /** Fails the transaction if the fingerprint is already indexed. */
@@ -84,6 +86,7 @@ export interface Tx {
   /** create: fails if it exists. merge: updates the given fields. */
   putEvidence(e: Partial<EvidenceDoc> & { evidenceId: string }, mode: 'create' | 'merge'): void;
   putHandoff(h: Partial<HandoffDoc> & { handoffId: string }, mode: 'create' | 'merge'): void;
+  putUsage(u: UsageMonth): void;
 }
 
 export interface Store {

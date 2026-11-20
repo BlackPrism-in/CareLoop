@@ -48,9 +48,46 @@ export function IntakeAssist({ onApply }: { onApply: (fields: Record<string, str
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
-        <Button onClick={extract} disabled={busy || text.trim().length < 20}>
-          {busy ? 'Reading…' : 'Fill the form from this text'}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={extract} disabled={busy || text.trim().length < 20}>
+            {busy ? 'Reading…' : 'Fill the form from this text'}
+          </Button>
+          <label className="text-[var(--muted)]">
+            or a PDF (≤ 5 MB, not stored):{' '}
+            <input
+              type="file"
+              accept="application/pdf"
+              aria-label="Choose instruction PDF"
+              disabled={busy}
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                setBusy(true);
+                setError(null);
+                try {
+                  const b64 = btoa(
+                    Array.from(new Uint8Array(await f.arrayBuffer()), (x) =>
+                      String.fromCharCode(x),
+                    ).join(''),
+                  );
+                  const r = await api<IntakeResult & { sourceText: string }>('/v1/intake/pdf', {
+                    method: 'POST',
+                    body: { pdfBase64: b64 },
+                  });
+                  setText(r.sourceText);
+                  setResult(r);
+                  onApply(
+                    Object.fromEntries(Object.entries(r.fields).map(([k, v]) => [k, v!.value])),
+                  );
+                } catch (err) {
+                  setError(describeError(err));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            />
+          </label>
+        </div>
         {error && <Notice tone="error">{error}</Notice>}
         {result && (
           <div className="space-y-2">

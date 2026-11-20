@@ -1,4 +1,5 @@
 import type {
+  UsageMonth,
   Case,
   Consent,
   EventEnvelope,
@@ -45,6 +46,7 @@ export class BufferedTx implements Tx {
   getOperation = (id: string) => this.rec<OperationRecord>('operations', id);
   getEvidence = (id: string) => this.rec<EvidenceDoc>('evidence', id);
   getHandoff = (id: string) => this.rec<HandoffDoc>('handoffs', id);
+  getUsage = (month: string) => this.rec<UsageMonth>('usage', month);
   getCaseIdByFingerprint = async (fp: string) =>
     (await this.rec<{ caseId: string }>('case_fingerprints', fp))?.caseId ?? null;
 
@@ -92,5 +94,8 @@ export class BufferedTx implements Tx {
   }
   putHandoff(h: Partial<HandoffDoc> & { handoffId: string }, mode: 'create' | 'merge') {
     this.writes.push({ path: tenantRecord(this.tenantId, 'handoffs', h.handoffId), data: h, mode });
+  }
+  putUsage(u: UsageMonth) {
+    this.writes.push({ path: tenantRecord(this.tenantId, 'usage', u.month), data: u, mode: 'set' });
   }
 }

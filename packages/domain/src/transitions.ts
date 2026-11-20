@@ -1,4 +1,5 @@
 import type {
+  UsageMonth,
   Case,
   Consent,
   ContactChannel,
@@ -179,6 +180,8 @@ export interface DispatchFacts {
   maxCaseAudioSeconds: number;
   now: Date;
   channel: ContactChannel;
+  /** This month's lab usage so far (null = none yet). */
+  usage?: UsageMonth | null;
 }
 
 /**
@@ -207,6 +210,14 @@ export function dispatchContact(c: Case, f: DispatchFacts): Transition {
     throw guardFailed('OUTSIDE_CONTACT_WINDOW');
   if (c.contactAttempts >= f.maxContactAttempts) throw guardFailed('CONTACT_ATTEMPTS_EXHAUSTED');
   if (c.audioSecondsUsed >= f.maxCaseAudioSeconds) throw guardFailed('AUDIO_BUDGET_EXHAUSTED');
+  // Lab-level contracted allowance for the month (Blueprint p.10).
+  const limits = f.tenant.limits;
+  if (limits && f.usage) {
+    if (f.usage.contactAttempts >= limits.monthlyContactAttempts)
+      throw guardFailed('LAB_MONTHLY_CONTACT_LIMIT_REACHED');
+    if (f.usage.voiceSeconds >= limits.monthlyVoiceSeconds)
+      throw guardFailed('LAB_MONTHLY_VOICE_LIMIT_REACHED');
+  }
 
   const attempt = c.contactAttempts + 1;
   return {

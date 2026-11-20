@@ -96,6 +96,16 @@ export class VoiceSessionController {
     this.clock = deps.clock ?? (() => new Date());
   }
 
+  /** Fire-and-forget work must never become an unhandled rejection (it would end every call on this instance). */
+  private background(p: Promise<unknown>): void {
+    p.catch((e: Error) =>
+      this.deps.log.error('voice background task failed', {
+        interactionId: this.info.interactionId,
+        error: e.message,
+      }),
+    );
+  }
+
   private get agent(): ActorContext {
     return {
       tenantId: this.info.tenantId,
@@ -160,11 +170,11 @@ export class VoiceSessionController {
         onAudio: (data, mimeType) => this.send({ type: 'audio', data, mimeType }),
         onInterrupted: () => this.send({ type: 'interrupted' }),
         onTurnComplete: () => undefined,
-        onInputTranscript: (t) => void this.onPatientText(t, false),
+        onInputTranscript: (t) => this.background(this.onPatientText(t, false)),
         onOutputTranscript: (t) => this.onAgentText(t),
-        onToolCalls: (calls) => void this.onToolCalls(calls),
+        onToolCalls: (calls) => this.background(this.onToolCalls(calls)),
         onClose: (reason) => {
-          if (this.connected) void this.end(reason);
+          if (this.connected) this.background(this.end(reason));
         },
       },
     );
@@ -193,7 +203,9 @@ export class VoiceSessionController {
         Math.max(0, (this.deps.capSeconds - 15) * 1000),
       ),
     );
-    this.timers.push(setTimeout(() => void this.end('SESSION_CAP'), this.deps.capSeconds * 1000));
+    this.timers.push(
+      setTimeout(() => this.background(this.end('SESSION_CAP')), this.deps.capSeconds * 1000),
+    );
     this.live.sendText('[Gateway note: the call has connected. Begin with your introduction.]');
   }
 
@@ -285,7 +297,7 @@ export class VoiceSessionController {
       if (!(e instanceof DomainError && e.reason === 'HANDOFF_ALREADY_OPEN')) throw e;
     }
     this.routedToStaff = true;
-    void this.deps.dispatcher.dispatchCase(this.info.tenantId, this.info.caseId);
+    this.background(this.deps.dispatcher.dispatchCase(this.info.tenantId, this.info.caseId));
     return { status: 'ROUTED_TO_STAFF' };
   }
 
@@ -501,8 +513,8 @@ export class VoiceSessionController {
           kind: 'tool',
           detail: 'Patient opted out — automated contact stopped',
         });
-        void this.deps.dispatcher.dispatchCase(this.info.tenantId, this.info.caseId);
-        this.timers.push(setTimeout(() => void this.end('OPTED_OUT'), 8000));
+        this.background(this.deps.dispatcher.dispatchCase(this.info.tenantId, this.info.caseId));
+        this.timers.push(setTimeout(() => this.background(this.end('OPTED_OUT')), 8000));
         return {
           status: 'OPTED_OUT',
           instruction:
@@ -510,7 +522,7 @@ export class VoiceSessionController {
         };
       }
       case 'end_call':
-        this.timers.push(setTimeout(() => void this.end('AGENT_ENDED'), 2500));
+        this.timers.push(setTimeout(() => this.background(this.end('AGENT_ENDED')), 2500));
         return { status: 'ENDING' };
       default:
         return { error: 'UNKNOWN_TOOL' };
@@ -594,7 +606,7 @@ export class VoiceSessionController {
         { merge: true },
       )
       .catch((e: Error) => this.deps.log.warn('could not store interaction', { error: e.message }));
-    void this.deps.dispatcher.dispatchCase(this.info.tenantId, this.info.caseId);
+    this.background(this.deps.dispatcher.dispatchCase(this.info.tenantId, this.info.caseId));
     this.send({ type: 'ended', reason, disposition, audioSeconds });
   }
 }

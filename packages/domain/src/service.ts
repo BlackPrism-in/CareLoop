@@ -498,7 +498,10 @@ export class CaseCommands {
         this.load(tx.getConsent(c.consentId), 'CONSENT'),
         this.load(tx.getPatient(c.patientId), 'PATIENT'),
       ]);
-      return T.dispatchContact(c, {
+      const month = usageMonth(now, tenant.timeZone);
+      const usage = await tx.getUsage(month);
+      const t = T.dispatchContact(c, {
+        usage,
         tenant,
         site,
         consent,
@@ -509,6 +512,13 @@ export class CaseCommands {
         maxContactAttempts: this.deps.config.maxContactAttempts,
         maxCaseAudioSeconds: this.deps.config.maxCaseAudioSeconds,
       });
+      // Counted in the same transaction as the attempt itself.
+      tx.putUsage({
+        month,
+        contactAttempts: (usage?.contactAttempts ?? 0) + 1,
+        voiceSeconds: usage?.voiceSeconds ?? 0,
+      });
+      return t;
     });
   }
 
@@ -532,12 +542,21 @@ export class CaseCommands {
       outcome: T.ContactOutcome | null;
     }>,
   ) {
-    return this.execute(ctx, 'recordInteractionEnded', req, (c) =>
-      T.recordInteractionEnded(c, {
+    return this.execute(ctx, 'recordInteractionEnded', req, async (c, tx, now) => {
+      const tenant = await this.load(tx.getTenant(), 'TENANT');
+      const month = usageMonth(now, tenant.timeZone);
+      const usage = await tx.getUsage(month);
+      const t = T.recordInteractionEnded(c, {
         ...req.input,
         maxContactAttempts: this.deps.config.maxContactAttempts,
-      }),
-    );
+      });
+      tx.putUsage({
+        month,
+        contactAttempts: usage?.contactAttempts ?? 0,
+        voiceSeconds: (usage?.voiceSeconds ?? 0) + req.input.audioSeconds,
+      });
+      return t;
+    });
   }
 
   recordPatientRequest(
@@ -913,4 +932,14 @@ export class CaseCommands {
   reopenCase(ctx: ActorContext, req: CommandRequest<{ reason: string }>) {
     return this.execute(ctx, 'reopenCase', req, (c) => T.reopenCase(c, req.input));
   }
+}
+
+/** Usage month key (YYYY-MM) in the lab's time zone. */
+export function usageMonth(now: Date, timeZone: string): string {
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(now);
+  return `${p.find((x) => x.type === 'year')!.value}-${p.find((x) => x.type === 'month')!.value}`;
 }

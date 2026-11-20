@@ -1,5 +1,5 @@
 import 'server-only';
-import type { Member } from '@careloop/contracts';
+import { loadConfig, type Member } from '@careloop/contracts';
 import type { ActorContext } from '@careloop/domain';
 import { adminAuth } from './firebase';
 import { HttpError } from './errors';
@@ -22,12 +22,18 @@ export async function requireStaff(req: Request, correlationId: string): Promise
 
   let uid: string;
   let tenantId: unknown;
+  let secondFactor: unknown;
   try {
     const decoded = await adminAuth().verifyIdToken(token, true);
     uid = decoded.uid;
     tenantId = decoded.tenantId;
+    secondFactor = decoded.firebase?.sign_in_second_factor;
   } catch {
     throw new HttpError('UNAUTHENTICATED', 'Session is invalid or expired');
+  }
+  if (!hasRequiredFactor(loadConfig().REQUIRE_STAFF_MFA, secondFactor)) {
+    // The UI turns this into "set up your authenticator app".
+    throw new HttpError('FORBIDDEN', 'MFA_REQUIRED');
   }
   if (typeof tenantId !== 'string' || !/^[A-Za-z0-9_-]+$/.test(tenantId)) {
     throw new HttpError('FORBIDDEN', 'Account is not a member of any lab');
@@ -40,4 +46,9 @@ export async function requireStaff(req: Request, correlationId: string): Promise
     member,
     ctx: { tenantId, actorType: 'STAFF', actorId: uid, roles: member.roleSet, correlationId },
   };
+}
+
+/** In the pilot every staff token must come from a second-factor sign-in (TOTP). */
+export function hasRequiredFactor(required: boolean, signInSecondFactor: unknown): boolean {
+  return !required || signInSecondFactor === 'totp' || signInSecondFactor === 'phone';
 }

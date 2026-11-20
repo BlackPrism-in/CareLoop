@@ -23,6 +23,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "demo:reset": "tsx --env-file-if-exists=../.env.local src/demo-reset.ts",
-    "smoke": "tsx src/smoke.ts"
+    "smoke": "tsx src/smoke.ts",
+    "load": "tsx src/load.ts"
   }
 }

@@ -37,10 +37,15 @@ export class TimeSweeps {
     this.clock = opts.clock ?? (() => new Date());
   }
 
-  async run(): Promise<{ awaitingEvidence: number; backupNotified: number }> {
+  async run(): Promise<{
+    awaitingEvidence: number;
+    backupNotified: number;
+    retentionDeleted: number;
+  }> {
     return {
       awaitingEvidence: await this.occurrencesPassed(),
       backupNotified: await this.overdueHandoffs(),
+      retentionDeleted: await this.retention(),
     };
   }
 
@@ -138,5 +143,43 @@ export class TimeSweeps {
       }
     }
     return n;
+  }
+
+  /**
+   * Retention defaults (MVP spec §19, a proposal for customer review). Deletes
+   * short-lived credentials once expired and operational records after 30
+   * days. Case, evidence, approval and audit records are kept under the
+   * customer's retention schedule and are not touched here. Bounded per run.
+   */
+  async retention(limit = 200): Promise<number> {
+    const now = this.clock();
+    const ago = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString();
+    const targets = [
+      this.db.collection('voice_tickets').where('expiresAt', '<', ago(1)),
+      this.db.collection('patient_sessions').where('expiresAt', '<', ago(1)),
+      this.db.collection('patient_links').where('expiresAt', '<', ago(30)),
+      this.db.collectionGroup('inbox').where('receivedAt', '<', ago(30)),
+      this.db.collectionGroup('notifications').where('createdAt', '<', ago(30)),
+      this.db
+        .collectionGroup('outbox')
+        .where('status', 'in', ['DONE', 'SKIPPED'])
+        .where('createdAt', '<', ago(30)),
+      this.db
+        .collectionGroup('jobs')
+        .where('status', 'in', ['DONE', 'SKIPPED'])
+        .where('updatedAt', '<', ago(30)),
+      this.db.collectionGroup('operations').where('createdAt', '<', ago(30)),
+    ];
+    let deleted = 0;
+    for (const q of targets) {
+      const snap = await q.limit(limit).get();
+      if (snap.empty) continue;
+      const batch = this.db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      deleted += snap.size;
+    }
+    if (deleted) this.log.info('retention sweep', { deleted });
+    return deleted;
   }
 }

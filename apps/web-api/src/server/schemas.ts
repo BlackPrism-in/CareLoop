@@ -140,3 +140,17 @@ export const PatientSessionBody = z.strictObject({
 export const PatientActionBody = z.strictObject({
   action: z.enum(['REQUEST_CHANGE', 'REQUEST_CALLBACK', 'STOP_CONTACT']),
 });
+
+export const ReasonOnlyBody = z.strictObject({ reason: z.string().trim().min(1).max(300) });
+
+export const CsvIntakeBody = z.strictObject({
+  csv: z.string().min(1).max(64_000),
+  commit: z.boolean().default(false),
+  previewHash: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
+});
+
+/** Base64 PDF, ≤ 5 MB decoded. The file is processed in memory and not stored. */
+export const PdfIntakeBody = z.strictObject({ pdfBase64: z.string().min(10).max(7_000_000) });

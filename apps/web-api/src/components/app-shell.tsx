@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useRequireStaff } from './auth-provider';
+import { MfaEnroll } from './mfa-enroll';
 import { Button, cx, Notice, Skeleton } from './ui';
 
 const NAV = [
@@ -26,6 +27,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
     );
   }
+  if (status === 'mfa-enroll') return <MfaEnroll />;
   if (status === 'no-access') {
     return (
       <div className="mx-auto max-w-md p-6">

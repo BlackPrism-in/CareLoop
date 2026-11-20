@@ -15,7 +15,7 @@ const config: NextConfig = {
     '@careloop/jobs',
     '@careloop/adapters',
   ],
-  serverExternalPackages: ['firebase-admin', 'google-auth-library', '@google/genai'],
+  serverExternalPackages: ['firebase-admin', 'google-auth-library', '@google/genai', 'unpdf'],
   outputFileTracingRoot: root,
   poweredByHeader: false,
 };

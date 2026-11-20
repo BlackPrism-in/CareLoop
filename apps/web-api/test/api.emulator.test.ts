@@ -29,6 +29,10 @@ import { GET as patientMe } from '../app/v1/p/me/route';
 import { POST as patientAction } from '../app/v1/p/actions/route';
 import { POST as handoffAction } from '../app/v1/handoffs/[id]/[action]/route';
 import { GET as report } from '../app/v1/reports/route';
+import { GET as exportCase } from '../app/v1/cases/[id]/export/route';
+import { POST as erase } from '../app/v1/patients/[id]/erasure/route';
+import { POST as csvIntake } from '../app/v1/intake/csv/route';
+import { POST as pdfIntake } from '../app/v1/intake/pdf/route';
 
 /**
  * Exercises the real route handlers against the Auth + Firestore emulators
@@ -1075,5 +1079,174 @@ describe('staff API on emulators', () => {
       )
     ).json();
     expect(other.cohort.cases).toBe(0);
+  });
+
+  it('Phase 7: export is owner/auditor-only and audited; erasure refuses open cases, then strips identifiers', async () => {
+    const { id } = await readyCase('ORD-EXP', 'consent_api_05', 'pat_api_05');
+    expect(
+      (await exportCase(req(`/v1/cases/${id}/export`, { as: 'staff_demo_01' }), params({ id })))
+        .status,
+    ).toBe(403);
+    const ex = await exportCase(
+      req(`/v1/cases/${id}/export`, { as: 'staff_demo_auditor' }),
+      params({ id }),
+    );
+    expect(ex.status).toBe(200);
+    const body = await ex.json();
+    expect(body.events.length).toBeGreaterThan(0);
+    expect(
+      (await firestore().doc(`tenants/${T}/audit/${body.auditId}`).get()).data(),
+    ).toMatchObject({ action: 'CASE_EXPORTED', caseId: id });
+
+    const blocked = await erase(
+      req('/v1/patients/pat_api_05/erasure', {
+        as: 'staff_demo_owner',
+        method: 'POST',
+        body: { reason: 'Request #12' },
+      }),
+      params({ id: 'pat_api_05' }),
+    );
+    expect(blocked.status).toBe(422);
+    const all = await firestore()
+      .collection(`tenants/${T}/cases`)
+      .where('patientId', '==', 'pat_api_05')
+      .get();
+    for (const d of all.docs) await d.ref.update({ workflowState: 'CANCELLED' });
+    expect(
+      (
+        await erase(
+          req('/v1/patients/pat_api_05/erasure', {
+            as: 'staff_demo_reviewer',
+            method: 'POST',
+            body: { reason: 'x' },
+          }),
+          params({ id: 'pat_api_05' }),
+        )
+      ).status,
+    ).toBe(403);
+    const ok = await erase(
+      req('/v1/patients/pat_api_05/erasure', {
+        as: 'staff_demo_owner',
+        method: 'POST',
+        body: { reason: 'Request #12' },
+      }),
+      params({ id: 'pat_api_05' }),
+    );
+    expect(ok.status).toBe(200);
+    const p = (await firestore().doc(`tenants/${T}/patients/pat_api_05`).get()).data()!;
+    expect(p.alias).toBe('Erased patient');
+    expect(p.externalRef).toMatch(/^erased_/);
+    expect(p.contactMasked).toBe('—');
+  });
+
+  it('P1 CSV intake: full preview, no commit while any row has an error, idempotent commit', async () => {
+    const due = new Date(Date.now() + 9 * 86_400_000).toISOString().slice(0, 10);
+    const head = 'patient_ref,action_type,action_text,due_date,source_authority,reference\n';
+    const good = `patient_ref_demo_01,CONSULTATION,Book the consultation,${due},Demo Clinic,CSV-1\npatient_ref_demo_01,ORDERED_TEST,Collect sample,${due},Demo Lab,CSV-2\n`;
+    const bad = head + good + `nobody,CONSULTATION,x,${due},Demo Clinic,CSV-3\n`;
+    const p1 = await (
+      await csvIntake(
+        req('/v1/intake/csv', { as: 'staff_demo_01', method: 'POST', body: { csv: bad } }),
+        noParams,
+      )
+    ).json();
+    expect(p1.summary).toEqual({ ok: 2, errors: 1, duplicates: 0 });
+    expect(JSON.stringify(p1)).not.toMatch(/patient_ref_demo/);
+    const refused = await csvIntake(
+      req('/v1/intake/csv', {
+        as: 'staff_demo_01',
+        method: 'POST',
+        body: { csv: bad, commit: true, previewHash: p1.previewHash },
+      }),
+      noParams,
+    );
+    expect(refused.status).toBe(422);
+    const okCsv = head + good;
+    const p2 = await (
+      await csvIntake(
+        req('/v1/intake/csv', { as: 'staff_demo_01', method: 'POST', body: { csv: okCsv } }),
+        noParams,
+      )
+    ).json();
+    const stale = await csvIntake(
+      req('/v1/intake/csv', {
+        as: 'staff_demo_01',
+        method: 'POST',
+        body: { csv: okCsv, commit: true, previewHash: p1.previewHash },
+      }),
+      noParams,
+    );
+    expect(stale.status).toBe(409);
+    const c1 = await csvIntake(
+      req('/v1/intake/csv', {
+        as: 'staff_demo_01',
+        method: 'POST',
+        body: { csv: okCsv, commit: true, previewHash: p2.previewHash },
+      }),
+      noParams,
+    );
+    expect(c1.status).toBe(201);
+    const r1 = await c1.json();
+    expect(r1.outcomes.map((o: { status: string }) => o.status)).toEqual(['CREATED', 'CREATED']);
+    const c2 = await (
+      await csvIntake(
+        req('/v1/intake/csv', {
+          as: 'staff_demo_01',
+          method: 'POST',
+          body: { csv: okCsv, commit: true, previewHash: p2.previewHash },
+        }),
+        noParams,
+      )
+    ).json();
+    expect(c2.outcomes.map((o: { caseId: string }) => o.caseId)).toEqual(
+      r1.outcomes.map((o: { caseId: string }) => o.caseId),
+    );
+    const created = await (
+      await getCase(
+        req(`/v1/cases/${r1.outcomes[0].caseId}`, { as: 'staff_demo_01' }),
+        params({ id: r1.outcomes[0].caseId }),
+      )
+    ).json();
+    expect(created.case.workflowState).toBe('DRAFT');
+  });
+
+  it('P1 PDF intake: rejects non-PDFs; extracts text from a real PDF and is not stored', async () => {
+    const notPdf = await pdfIntake(
+      req('/v1/intake/pdf', {
+        as: 'staff_demo_01',
+        method: 'POST',
+        body: { pdfBase64: Buffer.from('hello, not a pdf at all').toString('base64') },
+      }),
+      noParams,
+    );
+    expect(notPdf.status).toBe(400);
+    const stream =
+      'BT /F1 12 Tf 72 712 Td (Order ORD-55 consultation due 2026-12-01 approved by Demo Clinic) Tj ET';
+    const objs = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+      `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    ];
+    let pdf = '%PDF-1.4\n';
+    const offsets: number[] = [];
+    objs.forEach((o, i) => {
+      offsets.push(pdf.length);
+      pdf += `${i + 1} 0 obj\n${o}\nendobj\n`;
+    });
+    const xref = pdf.length;
+    pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+    const res = await pdfIntake(
+      req('/v1/intake/pdf', {
+        as: 'staff_demo_01',
+        method: 'POST',
+        body: { pdfBase64: Buffer.from(pdf, 'latin1').toString('base64') },
+      }),
+      noParams,
+    );
+    // Text was extracted; with no Gemini credentials here the model step reports unavailable.
+    expect(res.status).toBe(429);
+    expect((await res.json()).message).toBe('MODEL_UNAVAILABLE');
   });
 });

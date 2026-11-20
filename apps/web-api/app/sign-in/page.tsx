@@ -1,5 +1,11 @@
 'use client';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import {
+  getMultiFactorResolver,
+  signInWithEmailAndPassword,
+  TotpMultiFactorGenerator,
+  type MultiFactorError,
+  type MultiFactorResolver,
+} from 'firebase/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useAuth } from '@/components/auth-provider';
@@ -16,6 +22,8 @@ function SignInForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [resolver, setResolver] = useState<MultiFactorResolver | null>(null);
+  const [code, setCode] = useState('');
 
   useEffect(() => {
     if (status === 'ready') router.replace(safeNext);
@@ -26,9 +34,21 @@ function SignInForm() {
     setBusy(true);
     setError(null);
     try {
-      await signInWithEmailAndPassword(clientAuth(), email.trim(), password);
-    } catch {
-      setError('Email or password is incorrect.');
+      if (resolver) {
+        const hint = resolver.hints.find((h) => h.factorId === TotpMultiFactorGenerator.FACTOR_ID);
+        if (!hint) throw new Error('no totp');
+        await resolver.resolveSignIn(
+          TotpMultiFactorGenerator.assertionForSignIn(hint.uid, code.trim()),
+        );
+      } else {
+        await signInWithEmailAndPassword(clientAuth(), email.trim(), password);
+      }
+    } catch (err) {
+      if ((err as { code?: string }).code === 'auth/multi-factor-auth-required') {
+        setResolver(getMultiFactorResolver(clientAuth(), err as MultiFactorError));
+      } else {
+        setError(resolver ? 'That code did not match.' : 'Email or password is incorrect.');
+      }
     } finally {
       setBusy(false);
     }
@@ -62,6 +82,19 @@ function SignInForm() {
             onChange={(e) => setPassword(e.target.value)}
           />
         </Field>
+        {resolver && (
+          <Field label="Code from your authenticator app">
+            <input
+              className={inputClass}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              autoFocus
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+            />
+          </Field>
+        )}
         {error && <Notice tone="error">{error}</Notice>}
         {status === 'no-access' && (
           <Notice tone="error">This account isn't an active member of a lab.</Notice>

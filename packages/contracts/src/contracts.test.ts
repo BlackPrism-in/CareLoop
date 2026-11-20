@@ -49,8 +49,17 @@ describe('loadConfig', () => {
       /only allowed/,
     );
     expect(
-      loadConfig({ ...baseEnv, APP_ENV: 'pilot', OUTREACH_ENABLED: 'true' }).OUTREACH_ENABLED,
+      loadConfig({
+        ...baseEnv,
+        APP_ENV: 'pilot',
+        OUTREACH_ENABLED: 'true',
+        REQUIRE_STAFF_MFA: 'true',
+      }).OUTREACH_ENABLED,
     ).toBe(true);
+  });
+
+  it('the pilot cannot run without staff MFA', () => {
+    expect(() => loadConfig({ ...baseEnv, APP_ENV: 'pilot' })).toThrow(/REQUIRE_STAFF_MFA/);
   });
 
   it('requires model IDs to be configured', () => {

@@ -78,6 +78,7 @@ describe('voice gateway (Firestore emulator)', () => {
   let live: ScriptedLive;
   let sent: ServerMessage[];
   let worker: NodeJS.Timeout;
+  const inFlight = new Set<Promise<unknown>>();
   let queue: MemoryQueue;
   let dispatcher: OutboxDispatcher;
   let booking: SandboxBookingAdapter;
@@ -136,10 +137,11 @@ describe('voice gateway (Firestore emulator)', () => {
       clock,
     });
     // A tiny in-test worker draining the queue, standing in for Cloud Tasks + the worker service.
-    worker = setInterval(
-      () => void Promise.all(queue.drain().map((t) => runner.run(t.tenantId, t.outboxId))),
-      50,
-    );
+    worker = setInterval(() => {
+      const batch = Promise.all(queue.drain().map((t) => runner.run(t.tenantId, t.outboxId)));
+      inFlight.add(batch);
+      batch.catch(() => undefined).finally(() => inFlight.delete(batch));
+    }, 50);
     live = new ScriptedLive();
     sent = [];
     const d = new Driver(commands);
@@ -148,7 +150,12 @@ describe('voice gateway (Firestore emulator)', () => {
     await d.dispatch(); // CONTACTING
   });
 
-  afterEach(() => clearInterval(worker));
+  // Stop the in-test worker and let its jobs settle before the next test wipes the database.
+  afterEach(async () => {
+    clearInterval(worker);
+    await Promise.allSettled([...inFlight]);
+    await new Promise((r) => setTimeout(r, 100));
+  });
 
   it('Phase 4 exit: a patient who can only come after work gets an offered evening slot booked, honestly reported', async () => {
     const c = controller();

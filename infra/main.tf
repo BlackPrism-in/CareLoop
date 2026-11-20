@@ -32,6 +32,7 @@ locals {
     VOICE_ADAPTER          = "browser"
     MESSAGING_ADAPTER      = "simulated"
     OUTREACH_ENABLED       = tostring(var.outreach_enabled)
+    REQUIRE_STAFF_MFA      = var.app_env == "pilot" ? "true" : "false"
     MAX_CONTACT_ATTEMPTS   = "2"
     MAX_CASE_AUDIO_SECONDS = "180"
     CLOUD_TASKS_QUEUE      = google_cloud_tasks_queue.jobs.name

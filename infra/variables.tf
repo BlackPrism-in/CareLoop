@@ -40,3 +40,9 @@ variable "outreach_enabled" {
     error_message = "Outreach may only be enabled in the pilot environment."
   }
 }
+
+variable "alert_email" {
+  type        = string
+  default     = ""
+  description = "Named on-call operator for alerts (MVP spec §20: never an unmonitored inbox). Empty disables alerting."
+}

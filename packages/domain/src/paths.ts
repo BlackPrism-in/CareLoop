@@ -33,6 +33,7 @@ export const TENANT_COLLECTIONS = [
   'sandbox_reservations',
   'notifications',
   'audit',
+  'usage',
 ] as const;
 export type TenantCollection = (typeof TENANT_COLLECTIONS)[number];
 

@@ -7,6 +7,9 @@ import { createLogger } from '@careloop/observability';
 import { createApp } from './app';
 
 const log = createLogger('careloop-worker');
+process.on('unhandledRejection', (e) =>
+  log.error('unhandled rejection', { error: e instanceof Error ? e.message : String(e) }),
+);
 const cfg = loadConfig();
 const app = getApps()[0] ?? initializeApp({ projectId: cfg.GOOGLE_CLOUD_PROJECT });
 const runtime = createJobRuntime(cfg, getFirestore(app), log);
