@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { JobRuntime } from '@careloop/jobs';
 import { createLogger } from '@careloop/observability';
 
@@ -22,7 +22,10 @@ export const TASK_KINDS = {
  */
 export function createApp(runtime: JobRuntime) {
   const app = new Hono();
-  app.get('/healthz', (c) => c.json({ status: 'ok', service: 'careloop-worker' }));
+  // /healthz for the container probe; /health publicly (Cloud Run's frontend reserves /healthz).
+  const health = (c: Context) => c.json({ status: 'ok', service: 'careloop-worker' });
+  app.get('/healthz', health);
+  app.get('/health', health);
 
   // Scheduler entry point: recover stuck outbox work, then time-based checks.
   app.post('/tasks/recovery-sweep', async (c) =>

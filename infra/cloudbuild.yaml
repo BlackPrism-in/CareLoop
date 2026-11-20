@@ -1,0 +1,39 @@
+# Builds and pushes the three images with Cloud Build (no local Docker needed).
+# Used by scripts/deploy-direct.sh; the GitHub pipeline builds with Docker instead.
+substitutions:
+  _REGION: asia-south1
+  _TAG: manual
+  _FIREBASE_API_KEY: ''
+steps:
+  - id: web-api
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f=apps/web-api/Dockerfile
+      - --build-arg=NEXT_PUBLIC_FIREBASE_API_KEY=${_FIREBASE_API_KEY}
+      - --build-arg=NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${PROJECT_ID}.firebaseapp.com
+      - --build-arg=NEXT_PUBLIC_FIREBASE_PROJECT_ID=${PROJECT_ID}
+      - -t=${_REGION}-docker.pkg.dev/${PROJECT_ID}/careloop/web-api:${_TAG}
+      - .
+    waitFor: ['-']
+  - id: worker
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f=apps/worker/Dockerfile
+      - -t=${_REGION}-docker.pkg.dev/${PROJECT_ID}/careloop/worker:${_TAG}
+      - .
+    waitFor: ['-']
+  - id: voice
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f=apps/voice/Dockerfile
+      - -t=${_REGION}-docker.pkg.dev/${PROJECT_ID}/careloop/voice:${_TAG}
+      - .
+    waitFor: ['-']
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/careloop/web-api:${_TAG}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/careloop/worker:${_TAG}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/careloop/voice:${_TAG}
+timeout: 2400s

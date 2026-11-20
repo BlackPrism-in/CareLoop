@@ -1,0 +1,15 @@
+# Cloud Build upload (infra/cloudbuild.yaml). Mirrors .dockerignore; never uploads secrets.
+.git
+**/node_modules
+**/.next
+**/dist
+**/*.log
+.env
+.env.*
+!.env.example
+infra/.terraform
+infra/**/*.tfvars
+infra/*.tfstate*
+evals/reports
+emulator-data
+**/.DS_Store

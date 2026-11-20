@@ -48,3 +48,20 @@ It is a no-op until `STAGING_GCP_PROJECT` is set, and it never touches the pilot
 4. **Secrets:** add the webhook signing secret value (JSON `{"sandbox:<account>":"<random 32+ chars>"}`) to Secret Manager `webhook-signing-secrets`, and the `provider_accounts/sandbox__<account>` mapping document.
 
 Terraform ignores image changes on the Cloud Run services, so `terraform apply` won't roll back what the pipeline deployed.
+
+## Direct deploy from a laptop (no GitHub Actions, no local Docker)
+For a demo/staging project when the GitHub pipeline isn't set up yet. Run once per project after `terraform apply`:
+
+1. Load the synthetic lab and staff logins. The password is saved to `.env.staging.local` (git-ignored), never printed:
+
+   ```bash
+   pnpm --filter @careloop/scripts bootstrap:staging --project <PROJECT_ID> --confirm <PROJECT_ID>
+   ```
+
+2. Build with Cloud Build, deploy each service by digest, release Firestore rules and indexes, and run the smoke test (signed in, using the bootstrap logins):
+
+   ```bash
+   scripts/deploy-direct.sh <PROJECT_ID>
+   ```
+
+Both refuse project IDs containing `pilot` or `prod`. Re-running the bootstrap restores the fixture records (it does not delete cases created during a demo).

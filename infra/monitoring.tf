@@ -18,7 +18,7 @@ resource "google_monitoring_uptime_check_config" "health" {
   timeout      = "10s"
   period       = "300s"
   http_check {
-    path         = each.key == "web" ? "/api/health" : "/healthz"
+    path         = each.key == "web" ? "/api/health" : "/health" # Cloud Run reserves /healthz publicly
     port         = 443
     use_ssl      = true
     validate_ssl = true

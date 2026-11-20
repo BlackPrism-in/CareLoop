@@ -7,7 +7,8 @@ resource "google_service_account" "svc" {
 
 locals {
   grants = {
-    "web-api" = ["roles/datastore.user", "roles/cloudtasks.enqueuer", "roles/logging.logWriter"]
+    # firebaseauth.viewer: verifyIdToken(checkRevoked) reads the user record.
+    "web-api" = ["roles/datastore.user", "roles/cloudtasks.enqueuer", "roles/logging.logWriter", "roles/firebaseauth.viewer"]
     "worker"  = ["roles/datastore.user", "roles/cloudtasks.enqueuer", "roles/aiplatform.user", "roles/logging.logWriter"]
     "voice"   = ["roles/datastore.user", "roles/aiplatform.user", "roles/cloudtasks.enqueuer", "roles/logging.logWriter"]
   }

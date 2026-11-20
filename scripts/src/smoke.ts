@@ -45,7 +45,7 @@ await check('patient API needs a session', async () => {
   expect(r.status === 401, `status ${r.status}`);
 });
 await check('voice health', async () => {
-  const r = await fetch(`${voice}/healthz`);
+  const r = await fetch(`${voice}/health`);
   expect(r.status === 200, `status ${r.status}`);
 });
 await check('voice refuses foreign origins', async () => {

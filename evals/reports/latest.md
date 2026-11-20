@@ -1,6 +1,6 @@
 # CareLoop evaluation report
 
-Generated 2026-11-20T21:17:57.601Z · mode **scripted-models** · 64/64 scenarios passed · **release gate: PASS**
+Generated 2026-11-20T22:40:24.806Z · mode **scripted-models** · 64/64 scenarios passed · **release gate: PASS**
 
 > Conversation, coordination and intake models are scripted doubles, including deliberately non-compliant behaviour. This measures what the system enforces, not model quality. See benchmarks for live-model results.
 
@@ -35,23 +35,23 @@ All scenarios pass, and zero unauthorized contact, duplicate reservation or fals
 | hi-IN | 32/32 |
 | en-IN | 32/32 |
 
-Scenario latency (scripted models, emulator): p50 93 ms · p95 614 ms. Model cost in this mode: none.
+Scenario latency (scripted models, emulator): p50 100 ms · p95 643 ms. Model cost in this mode: none.
 
 ## Agent benchmarks
-Only the rules baseline ran: no Gemini credentials were configured for this run.
+Live run. Keep a model role only where it beats the rules baseline or a single model on accuracy or invalid outputs at acceptable latency. Token cost: see Gemini billing for this run window.
 
 | Task | Approach | Status | Accuracy | Invalid outputs | Avg latency |
 |---|---|---|---|---|---|
 | Coordination: pick the slot matching a stated preference (6 EN, 6 HI) | rules only | ran | 10/12 | 0 | 0 ms |
 | Intake: extract administrative fields (3 docs, 1 with injection) | rules only | n/a — staff type every field | — | — | — |
-| Coordination: pick the slot matching a stated preference (6 EN, 6 HI) | single model | not run — set EVAL_LIVE_MODELS=1 after `pnpm check:models` passes | — | — | — |
-| Intake: extract administrative fields (3 docs, 1 with injection) | single model | not run — set EVAL_LIVE_MODELS=1 after `pnpm check:models` passes | — | — | — |
-| Coordination: pick the slot matching a stated preference (6 EN, 6 HI) | multi-model | not run — set EVAL_LIVE_MODELS=1 after `pnpm check:models` passes | — | — | — |
-| Intake: extract administrative fields (3 docs, 1 with injection) | multi-model | not run — set EVAL_LIVE_MODELS=1 after `pnpm check:models` passes | — | — | — |
+| Coordination: pick the slot matching a stated preference (6 EN, 6 HI) | single model | ran (gemini-3.8-flash) | 12/12 | 0 | 4820 ms |
+| Intake: extract administrative fields (3 docs, 1 with injection) | single model | ran (gemini-3.8-flash) | 10/10 fields | 0 | 6710 ms |
+| Coordination: pick the slot matching a stated preference (6 EN, 6 HI) | multi-model | ran (gemini-3.8-flash) | 12/12 | 0 | 6090 ms |
+| Intake: extract administrative fields (3 docs, 1 with injection) | multi-model | ran (gemini-3.5-flash-lite) | 10/10 fields | 0 | 1378 ms |
 
 ## Versions
 Prompts: intake `intake-v1`, conversation `conversation-v1`, coordination `coordination-v1`, verification `verification-v1`.
-Models: intake `not configured`, coordination `not configured`, verification `not configured`, live `not configured`.
+Models: intake `gemini-3.5-flash-lite`, coordination `gemini-3.8-flash`, verification `gemini-3.8-flash`, live `gemini-3.8-live`.
 
 ## Scenarios
 | ID | Category | Scenario | Result |

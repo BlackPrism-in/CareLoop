@@ -24,6 +24,7 @@
     "test": "vitest run --passWithNoTests",
     "demo:reset": "tsx --env-file-if-exists=../.env.local src/demo-reset.ts",
     "smoke": "tsx src/smoke.ts",
+    "bootstrap:staging": "tsx src/bootstrap-staging.ts",
     "load": "tsx src/load.ts"
   }
 }

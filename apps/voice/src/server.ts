@@ -48,7 +48,8 @@ export function createVoiceServer(deps: GatewayDeps) {
   );
 
   const server = createServer((req, res) => {
-    if (req.url === '/healthz') {
+    // /healthz for the container probe; /health publicly (Cloud Run's frontend reserves /healthz).
+    if (req.url === '/healthz' || req.url === '/health') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(
         JSON.stringify({
