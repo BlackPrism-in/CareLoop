@@ -38,6 +38,8 @@ export const TENANT_COLLECTIONS = [
   'usage',
   'pilot',
   'time_logs',
+  'patient_contacts',
+  'messages',
 ] as const;
 export type TenantCollection = (typeof TENANT_COLLECTIONS)[number];
 

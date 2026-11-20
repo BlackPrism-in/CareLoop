@@ -56,3 +56,21 @@ variable "enabled_languages" {
     error_message = "enabled_languages may contain only hi-IN, en-IN and bn-IN."
   }
 }
+
+variable "whatsapp_phone_number_id" {
+  description = "Meta WhatsApp Cloud API phone number ID. Empty keeps messaging simulated. The access token goes in Secret Manager \"whatsapp-access-token\"."
+  type        = string
+  default     = ""
+}
+
+variable "whatsapp_test_recipients" {
+  description = "Outside the pilot, WhatsApp is sent only to these E.164 numbers (comma-separated): testers' own phones."
+  type        = string
+  default     = ""
+}
+
+variable "patient_app_url" {
+  description = "Link in the WhatsApp invite where patients get the app. Empty: <web URL>/app."
+  type        = string
+  default     = ""
+}

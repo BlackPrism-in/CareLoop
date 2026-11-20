@@ -24,3 +24,4 @@ export * from './consent';
 export * from './csv-intake';
 export * from './pilot';
 export * from './pilot-report';
+export * from './mobile-auth';

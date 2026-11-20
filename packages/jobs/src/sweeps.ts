@@ -9,6 +9,7 @@ import {
   type HandoffDoc,
 } from '@careloop/domain';
 import type { Logger } from '@careloop/observability';
+import type { PatientMessenger } from './patient-messages';
 
 export interface NotificationDoc {
   notificationId: string;
@@ -32,21 +33,62 @@ export class TimeSweeps {
     private readonly db: Firestore,
     private readonly commands: CaseCommands,
     private readonly log: Logger,
-    opts: { clock?: () => Date } = {},
+    opts: { clock?: () => Date; messenger?: PatientMessenger } = {},
   ) {
     this.clock = opts.clock ?? (() => new Date());
+    this.messenger = opts.messenger;
   }
+  private readonly messenger?: PatientMessenger;
 
   async run(): Promise<{
     awaitingEvidence: number;
     backupNotified: number;
     retentionDeleted: number;
+    remindersSent: number;
   }> {
     return {
       awaitingEvidence: await this.occurrencesPassed(),
       backupNotified: await this.overdueHandoffs(),
       retentionDeleted: await this.retention(),
+      remindersSent: await this.visitReminders(),
     };
+  }
+
+  /**
+   * WhatsApp reminder the day before a booked visit: appointments starting in
+   * the next 2–26 hours, sent once per booking, only during the site's
+   * contact hours (so nobody is messaged at night).
+   */
+  async visitReminders(): Promise<number> {
+    if (!this.messenger) return 0;
+    const now = this.clock();
+    const snap = await this.db
+      .collectionGroup('cases')
+      .where('workflowState', '==', 'BOOKED')
+      .where('bookedStartsAt', '>', new Date(now.getTime() + 2 * 3_600_000).toISOString())
+      .where('bookedStartsAt', '<', new Date(now.getTime() + 26 * 3_600_000).toISOString())
+      .limit(100)
+      .get();
+    let n = 0;
+    for (const d of snap.docs) {
+      const c = d.data() as Case;
+      const tenantId = d.ref.parent.parent!.id;
+      const site = (await this.db.doc(tenantRecord(tenantId, 'sites', c.siteId)).get()).data() as
+        Site | undefined;
+      if (site && !withinContactWindow(now, site.contactWindow, site.timeZone)) continue;
+      try {
+        const m = await this.messenger.send(
+          tenantId,
+          c,
+          'VISIT_REMINDER',
+          c.bookingRef ?? 'booking',
+        );
+        if (m.status === 'SENT' || m.status === 'SIMULATED') n++;
+      } catch (e) {
+        this.log.warn('visit reminder failed', { caseId: c.caseId, error: (e as Error).message });
+      }
+    }
+    return n;
   }
 
   private async occurrencesPassed(): Promise<number> {

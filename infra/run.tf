@@ -21,6 +21,25 @@ resource "google_cloud_run_v2_service" "web_api" {
           value = env.value
         }
       }
+      dynamic "env" {
+        for_each = local.whatsapp_env
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+      dynamic "env" {
+        for_each = var.whatsapp_phone_number_id == "" ? [] : [1]
+        content {
+          name = "WHATSAPP_ACCESS_TOKEN"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.secrets["whatsapp-access-token"].secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
       # Provider webhook signing secrets: value lives only in Secret Manager.
       env {
         name = "WEBHOOK_SIGNING_SECRETS"
@@ -61,6 +80,25 @@ resource "google_cloud_run_v2_service" "worker" {
         content {
           name  = env.key
           value = env.value
+        }
+      }
+      dynamic "env" {
+        for_each = local.whatsapp_env
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+      dynamic "env" {
+        for_each = var.whatsapp_phone_number_id == "" ? [] : [1]
+        content {
+          name = "WHATSAPP_ACCESS_TOKEN"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.secrets["whatsapp-access-token"].secret_id
+              version = "latest"
+            }
+          }
         }
       }
       startup_probe {

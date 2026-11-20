@@ -1,9 +1,12 @@
-import type { Site, Source, SupportedLanguage, ActionType } from '@careloop/contracts';
+import type { Consent, Site, Source, SupportedLanguage, ActionType } from '@careloop/contracts';
 import { SandboxBookingAdapter } from '@careloop/adapters';
 import {
   CaseCommands,
   FirestoreStore,
+  setPatientWhatsApp,
+  tenantCollection,
   tenantDoc,
+  type PatientContactDoc,
   tenantRecord,
   type ActorContext,
 } from '@careloop/domain';
@@ -22,6 +25,12 @@ const log = createLogger('demo-reset');
 log.info = () => undefined;
 
 const DEMO_TENANT = 't_demo_siliguri';
+// Testers' WhatsApp numbers linked to synthetic patients survive a reset.
+const linked = emulator
+  ? []
+  : (await db.collection(tenantCollection(DEMO_TENANT, 'patient_contacts')).get()).docs.map(
+      (d) => d.data() as PatientContactDoc,
+    );
 if (emulator) {
   await fetch(
     `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${projectId}/databases/(default)/documents`,
@@ -35,6 +44,17 @@ const bundle = await seedBase(db, { includeCases: false });
 if (bundle.tenant.tenantId !== DEMO_TENANT) throw new Error('fixture tenant changed');
 if (emulator) await seedLogins(bundle);
 const t = bundle.tenant.tenantId;
+for (const l of linked) {
+  await setPatientWhatsApp(db, { tenantId: t, patientId: l.patientId }, l.phoneE164, 'demo-reset');
+  for (const d of (
+    await db.collection(tenantCollection(t, 'consents')).where('patientId', '==', l.patientId).get()
+  ).docs) {
+    const k = d.data() as Consent;
+    if (!k.channels.includes('WHATSAPP'))
+      await d.ref.update({ channels: [...k.channels, 'WHATSAPP'], version: k.version + 1 });
+  }
+}
+if (linked.length) console.log(`Kept ${linked.length} linked WhatsApp test number(s).`);
 
 // Contact hours are enforced. If you rehearse outside 09:00–19:00 IST, widen them for the demo lab only.
 const hourIst = Number(

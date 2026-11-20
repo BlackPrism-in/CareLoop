@@ -181,6 +181,8 @@ export interface DispatchFacts {
   consent: Consent;
   patient: Patient;
   outreachEnabled: boolean;
+  /** See ServiceConfig.whatsappTestRecipientsOnly. */
+  whatsappTestRecipientsOnly?: boolean;
   maxContactAttempts: number;
   maxCaseAudioSeconds: number;
   now: Date;
@@ -199,7 +201,11 @@ export function dispatchContact(c: Case, f: DispatchFacts): Transition {
   if (!(c.workflowState === 'READY' || isRetry)) requireState(c, ['READY'], 'DISPATCH');
   // The kill switch guards contact with real people. A synthetic tenant's
   // browser-voice session reaches no one, so the demo can run with it off.
-  const simulatedOnly = f.tenant.simulation && f.channel === 'BROWSER_VOICE';
+  // Synthetic labs may use the browser call, and WhatsApp only when the sender can
+  // reach nothing but allow-listed test phones, so no real patient is contacted.
+  const simulatedOnly =
+    f.tenant.simulation &&
+    (f.channel === 'BROWSER_VOICE' || (f.channel === 'WHATSAPP' && !!f.whatsappTestRecipientsOnly));
   if (!f.outreachEnabled && !simulatedOnly) throw guardFailed('OUTREACH_DISABLED');
   // Pilot: baseline and usual-care cases follow the lab's normal process, never CareLoop contact.
   if (!automatedContactAllowed(c.pilotArm)) throw guardFailed('NOT_IN_INTERVENTION_ARM');
@@ -334,7 +340,8 @@ export function recordPatientRequest(
   c: Case,
   input: {
     interactionId: string;
-    identityAssurance: 'VERIFIED' | 'SIMULATED';
+    /** PHONE_OTP: the patient app, signed in with a code sent to the lab-recorded WhatsApp number. */
+    identityAssurance: 'VERIFIED' | 'SIMULATED' | 'PHONE_OTP';
     request: 'BOOK' | 'CALLBACK';
   },
 ): Transition {

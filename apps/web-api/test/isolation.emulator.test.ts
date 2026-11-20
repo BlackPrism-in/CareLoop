@@ -405,8 +405,13 @@ const OWN_TENANT_ROUTES = new Set([
 ]);
 /** Same path, different meaning per method: the GET lists the caller's own lab; the POST targets a case. */
 const OWN_TENANT_GETS = new Set(['/v1/time-logs']);
+// Patient link (/v1/p) and patient app (/v1/m) routes use their own sessions;
+// one patient cannot reach another's case (test/mobile.emulator.test.ts).
 const NOT_STAFF = (r: string) =>
-  r.startsWith('/v1/p/') || r.startsWith('/webhooks') || r.startsWith('/api/');
+  r.startsWith('/v1/p/') ||
+  r.startsWith('/v1/m/') ||
+  r.startsWith('/webhooks') ||
+  r.startsWith('/api/');
 const LAB_A_MARKERS = [
   'CL-ISO-A',
   'Alias A Secret',

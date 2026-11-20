@@ -100,10 +100,24 @@ export function BookingPanel({
               }
             >
               Start contact (simulated session)
+            </Button>{' '}
+            <Button
+              disabled={busy}
+              onClick={() =>
+                run(
+                  `/v1/cases/${c.caseId}/contact-requests`,
+                  { expectedVersion: c.version, channel: 'WHATSAPP' },
+                  'WhatsApp invite queued. The patient can book in the CareLoop app.',
+                )
+              }
+            >
+              Send WhatsApp invite
             </Button>
             <p className="text-xs text-[var(--muted)]">
               Re-checks approval, permission, contact hours and the attempt budget first. Then open
-              the call below, or record the patient&apos;s answer yourself.
+              the call below, or record the patient&apos;s answer yourself. The WhatsApp invite
+              needs the patient&apos;s WhatsApp number and WhatsApp permission; outside the pilot it
+              only reaches registered test phones.
             </p>
           </div>
         )}

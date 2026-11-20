@@ -19,6 +19,11 @@ import type { EvidenceDoc, EvidenceEventType, HandoffDoc } from './records';
 
 export interface ServiceConfig {
   outreachEnabled: boolean;
+  /**
+   * WhatsApp can reach only allow-listed test phones (non-pilot environments with
+   * WHATSAPP_TEST_RECIPIENTS). Lets synthetic labs send WhatsApp with outreach off.
+   */
+  whatsappTestRecipientsOnly?: boolean;
   maxContactAttempts: number;
   maxCaseAudioSeconds: number;
   /** Undefined = every supported language. */
@@ -528,6 +533,7 @@ export class CaseCommands {
         now,
         channel: req.input.channel,
         outreachEnabled: this.deps.config.outreachEnabled,
+        whatsappTestRecipientsOnly: this.deps.config.whatsappTestRecipientsOnly ?? false,
         maxContactAttempts: this.deps.config.maxContactAttempts,
         maxCaseAudioSeconds: this.deps.config.maxCaseAudioSeconds,
       });

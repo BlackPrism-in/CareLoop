@@ -5,3 +5,4 @@ pnpm-lock.yaml
 infra/.terraform
 *.md
 evals/reports
+apps/patient_app

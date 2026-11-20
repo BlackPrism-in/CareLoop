@@ -359,6 +359,20 @@ export function commandSuite(name: string, backend: () => TestBackend) {
       expect((await events()).at(-1)?.simulation).toBe(true);
     });
 
+    it('a synthetic tenant may send WhatsApp with outreach off only when it reaches test phones only', async () => {
+      await d.create();
+      await d.approve();
+      await b.seed(tenantRecord(T1, 'consents', 'c1'), {
+        ...(await b.read<object>(tenantRecord(T1, 'consents', 'c1'))),
+        channels: ['BROWSER_VOICE', 'WHATSAPP'],
+      });
+      const testOnly = make({ outreachEnabled: false, whatsappTestRecipientsOnly: true });
+      const r = d.track(
+        await testOnly.dispatchContact(SYSTEM, d.req({ channel: 'WHATSAPP' as const })),
+      );
+      expect(r.workflowState).toBe('CONTACTING');
+    });
+
     it('a rejected booking returns to scheduling; a late confirmation cannot resurrect a cancellation', async () => {
       await d.create();
       await d.approve();

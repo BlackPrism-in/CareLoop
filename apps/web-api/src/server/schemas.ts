@@ -52,7 +52,7 @@ const version = z.number().int().positive();
 
 export const ContactRequestBody = z.strictObject({
   expectedVersion: version,
-  channel: z.literal('BROWSER_VOICE'),
+  channel: z.enum(['BROWSER_VOICE', 'WHATSAPP']),
 });
 
 /** Staff recording what the patient asked for on a staff-handled call. */
@@ -140,6 +140,14 @@ export const PatientSessionBody = z.strictObject({
 export const PatientActionBody = z.strictObject({
   action: z.enum(['REQUEST_CHANGE', 'REQUEST_CALLBACK', 'STOP_CONTACT']),
 });
+
+export const MobileStartBody = z.strictObject({ phone: z.string().min(8).max(24) });
+export const MobileVerifyBody = z.strictObject({
+  phone: z.string().min(8).max(24),
+  code: z.string().max(10),
+});
+export const MobileBookBody = z.strictObject({ slotId: z.string().min(1).max(128) });
+export const PatientWhatsAppBody = z.strictObject({ phone: z.string().min(8).max(24) });
 
 export const ReasonOnlyBody = z.strictObject({ reason: z.string().trim().min(1).max(300) });
 

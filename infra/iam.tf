@@ -50,3 +50,11 @@ resource "google_secret_manager_secret_iam_member" "web_api_webhook_secrets" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.svc["web-api"].email}"
 }
+
+# The WhatsApp token: web-api sends login codes, worker sends invites, confirmations and reminders.
+resource "google_secret_manager_secret_iam_member" "whatsapp_token" {
+  for_each  = toset(["web-api", "worker"])
+  secret_id = google_secret_manager_secret.secrets["whatsapp-access-token"].secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.svc[each.value].email}"
+}

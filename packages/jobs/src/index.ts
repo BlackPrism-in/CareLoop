@@ -7,3 +7,4 @@ export * from './runtime';
 export * from './queries';
 export * from './webhooks';
 export * from './sweeps';
+export * from './patient-messages';

@@ -8,6 +8,7 @@ synthetic lab only. Real Gemini models pass `check:models` and the live eval.
 - Staff app: https://careloop-web-api-94524397144.asia-south1.run.app (use this URL; the other Cloud Run URL fails the voice origin check)
 - Staff logins: the five `@demo.careloop.test` addresses; the shared password is in `.env.staging.local` (git-ignored)
 - Redeploy: `scripts/deploy-direct.sh careloop-demo-2611` (see [DEPLOY.md](DEPLOY.md))
+- Patient app (Flutter) with WhatsApp-code sign-in: see [PATIENT_APP.md](PATIENT_APP.md). WhatsApp is not connected yet, so the demo lab shows the code on screen.
 
 Owner key: **You** = you, **Lab** = the pilot lab, **Eng** = code work
 (Claude can do it), **Counsel** = legal review.
@@ -66,13 +67,20 @@ Follow [GCP_SETUP.md](GCP_SETUP.md) step 6, then [DEPLOY.md](DEPLOY.md).
 - [ ] Trigger a test alert and confirm it reaches `alert_email`.
 - [ ] Run a backup **restore drill** ([RUNBOOK.md](RUNBOOK.md)) and record the time taken.
 
+## 2b. WhatsApp and the patient app
+- [x] **Eng:** Flutter patient app (Android/iOS), WhatsApp-code sign-in, booking, change/call requests, stop contact, in English, Hindi and Bengali.
+- [x] **Eng:** WhatsApp sender with four templates (login code, invite, booking confirmed, reminder). Outside the pilot it sends only to allow-listed test numbers.
+- [ ] **You:** WhatsApp Business Account ID, Phone number ID, a System User token stored in Secret Manager, and your own number for testing ([PATIENT_APP.md](PATIENT_APP.md)).
+- [ ] **Eng:** submit the templates, wait for Meta approval, set `whatsapp_phone_number_id` and `whatsapp_test_recipients`, then apply.
+- [ ] **You:** decide where the APK is downloaded from (`PATIENT_APP_ANDROID_URL`), or publish via Play Store internal testing / TestFlight (needs developer accounts).
+
 ## 3. Before real patients (pilot): blockers from [PILOT_READINESS.md](PILOT_READINESS.md)
 `OUTREACH_ENABLED` stays `false` until every row is ticked.
 
 **Decisions (cannot be coded around)**
 - [ ] **Lab + You:** patient identity verification method. Today it's a supervised button.
 - [ ] **You:** telephony provider (Exotel AgentStream): account, numbers, caller ID, rates.
-- [ ] **You:** WhatsApp provider, approved templates and opt-in wording.
+- [ ] **You:** WhatsApp: Meta business verification, approved templates and opt-in wording (the adapter is built; see 2b).
 - [ ] **Lab:** calendar integration, or confirm manual booking for the pilot.
 - [ ] **Counsel:**
   - NMC telemedicine fit
@@ -87,7 +95,7 @@ Follow [GCP_SETUP.md](GCP_SETUP.md) step 6, then [DEPLOY.md](DEPLOY.md).
 
 **Code that follows those decisions (Eng)**
 - [ ] Exotel calling adapter (signed callbacks via the existing webhook inbox).
-- [ ] WhatsApp adapter for patient links and confirmations (today: "Simulated — not sent").
+- [x] WhatsApp adapter for invites, confirmations, reminders and app sign-in codes.
 - [ ] The agreed identity check, replacing the supervised button.
 - [ ] Calendar adapter, if the lab has one.
 - [ ] Hindi and English voice quality tests: accents, interruptions, latency (p95 < 2 s target), script adherence.

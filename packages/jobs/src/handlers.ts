@@ -17,6 +17,7 @@ import type { Logger } from '@careloop/observability';
 import { PermanentError, TransientError, type JobHandler } from './runner';
 import type { BookingDoc, BookingStatus, OutboxDoc } from './types';
 import type { NotificationDoc } from './sweeps';
+import type { PatientMessenger } from './patient-messages';
 import type { InboxDoc } from './webhooks';
 
 export interface HandlerDeps {
@@ -25,6 +26,8 @@ export interface HandlerDeps {
   booking: BookingAdapter;
   log: Logger;
   clock?: () => Date;
+  /** WhatsApp invites and booking confirmations. Absent: none are sent. */
+  messenger?: PatientMessenger;
 }
 
 type Base = { caseId: string; expectedVersion: number; idempotencyKey: string };
@@ -124,6 +127,22 @@ export function createHandlers(deps: HandlerDeps): Partial<Record<OutboxDoc['kin
             },
           }),
         );
+        if (cmd.applied && deps.messenger) {
+          // The booking stands even if the message fails; the failure is recorded.
+          try {
+            await deps.messenger.send(
+              tenantId,
+              await readCase(tenantId, o.caseId),
+              'BOOKING_CONFIRMED',
+              bookingId,
+            );
+          } catch (e) {
+            deps.log.warn('booking confirmation message failed', {
+              caseId: o.caseId,
+              error: (e as Error).message,
+            });
+          }
+        }
         if (!cmd.applied) {
           // The case moved on (e.g. cancelled) while the provider reserved: release the slot.
           await booking.cancel(
@@ -417,11 +436,21 @@ export function createHandlers(deps: HandlerDeps): Partial<Record<OutboxDoc['kin
     BOOKING_REQUEST: bookingRequest,
     BOOKING_RECONCILE: bookingReconcile,
     BOOKING_CANCEL: bookingCancel,
-    // Contact attempts are carried out by the supervised voice gateway session, not dialled here.
-    CONTACT_ATTEMPT: async () => ({
-      status: 'SKIPPED',
-      result: { reason: 'HANDLED_BY_VOICE_SESSION' },
-    }),
+    // Voice attempts are carried out by the supervised voice gateway session, not dialled here.
+    // A WhatsApp attempt sends the follow-up invite with the patient-app link.
+    CONTACT_ATTEMPT: async ({ tenantId, outbox: o }) => {
+      const channel = (o.payload as { channel?: string }).channel;
+      if (channel !== 'WHATSAPP')
+        return { status: 'SKIPPED', result: { reason: 'HANDLED_BY_VOICE_SESSION' } };
+      if (!deps.messenger) return { status: 'SKIPPED', result: { reason: 'NO_MESSENGER' } };
+      const c = await readCase(tenantId, o.caseId);
+      if (c.workflowState !== 'CONTACTING')
+        return { status: 'SKIPPED', result: { reason: `CASE_${c.workflowState}` } };
+      const attempt = (o.payload as { attempt?: number }).attempt ?? 1;
+      const m = await deps.messenger.send(tenantId, c, 'FOLLOWUP_INVITE', `attempt-${attempt}`);
+      if (m.status === 'FAILED') throw new TransientError(m.reason ?? 'WHATSAPP_FAILED');
+      return { status: 'DONE', result: { message: m.status, reason: m.reason } };
+    },
     PROVIDER_EVENT: providerEvent,
     HANDOFF_NOTIFY: handoffNotify,
     // Suppression is enforced by execution-time checks in every handler and command.

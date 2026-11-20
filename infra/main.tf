@@ -30,7 +30,7 @@ locals {
     LIVE_MODEL_ID          = var.model_ids.live
     BOOKING_ADAPTER        = var.app_env == "pilot" ? "manual" : "sandbox"
     VOICE_ADAPTER          = "browser"
-    MESSAGING_ADAPTER      = "simulated"
+    MESSAGING_ADAPTER      = var.whatsapp_phone_number_id == "" ? "simulated" : "whatsapp"
     OUTREACH_ENABLED       = tostring(var.outreach_enabled)
     REQUIRE_STAFF_MFA      = var.app_env == "pilot" ? "true" : "false"
     MAX_CONTACT_ATTEMPTS   = "2"
@@ -43,6 +43,12 @@ locals {
     VOICE_ALLOWED_ORIGINS  = local.web_url
     PATIENT_LINK_BASE_URL  = local.web_url
     VOICE_PUBLIC_URL       = local.voice_wss
+    PATIENT_APP_URL        = var.patient_app_url == "" ? "${local.web_url}/app" : var.patient_app_url
+  }
+  # WhatsApp sender settings, only when a Meta phone number is configured.
+  whatsapp_env = var.whatsapp_phone_number_id == "" ? {} : {
+    WHATSAPP_PHONE_NUMBER_ID = var.whatsapp_phone_number_id
+    WHATSAPP_TEST_RECIPIENTS = var.whatsapp_test_recipients
   }
 }
 
@@ -96,7 +102,7 @@ resource "google_cloud_tasks_queue" "jobs" {
 
 # Secret containers only; values are added out-of-band, never in Terraform state.
 resource "google_secret_manager_secret" "secrets" {
-  for_each  = toset(["booking-provider-key", "messaging-provider-key", "telephony-provider-key", "webhook-signing-secrets"])
+  for_each  = toset(["booking-provider-key", "messaging-provider-key", "telephony-provider-key", "webhook-signing-secrets", "whatsapp-access-token"])
   secret_id = each.value
   replication {
     user_managed {

@@ -25,6 +25,8 @@
     "demo:reset": "tsx --env-file-if-exists=../.env.local src/demo-reset.ts",
     "smoke": "tsx src/smoke.ts",
     "bootstrap:staging": "tsx src/bootstrap-staging.ts",
+    "link-whatsapp": "tsx --env-file-if-exists=../.env.local src/link-whatsapp.ts",
+    "whatsapp-templates": "tsx src/whatsapp-templates.ts",
     "load": "tsx src/load.ts"
   }
 }

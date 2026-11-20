@@ -83,3 +83,4 @@ export interface EvidenceSourceAdapter {
 
 export * from './sandbox-booking';
 export * from './manual-booking';
+export * from './whatsapp';

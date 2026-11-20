@@ -30,7 +30,35 @@ export const AppConfig = z.object({
   LIVE_MODEL_ID: z.string().min(1),
   BOOKING_ADAPTER: z.enum(['sandbox', 'manual', 'provider']).default('sandbox'),
   VOICE_ADAPTER: z.enum(['browser', 'provider']).default('browser'),
-  MESSAGING_ADAPTER: z.enum(['simulated', 'provider']).default('simulated'),
+  /** simulated: nothing leaves CareLoop. whatsapp: WhatsApp Cloud API (Meta). */
+  MESSAGING_ADAPTER: z.enum(['simulated', 'provider', 'whatsapp']).default('simulated'),
+  /** WhatsApp Cloud API sender (Meta "Phone number ID"). The access token is a secret. */
+  WHATSAPP_PHONE_NUMBER_ID: z
+    .string()
+    .regex(/^\d{6,20}$/)
+    .optional(),
+  WHATSAPP_ACCESS_TOKEN: z.string().min(20).optional(),
+  WHATSAPP_GRAPH_VERSION: z
+    .string()
+    .regex(/^v\d+\.\d+$/)
+    .default('v23.0'),
+  /**
+   * Outside the pilot, WhatsApp is sent ONLY to these numbers (comma-separated
+   * E.164, e.g. +919800000000): testers' own phones linked to synthetic patients.
+   * Anyone else is recorded as simulated and not sent.
+   */
+  WHATSAPP_TEST_RECIPIENTS: z
+    .string()
+    .default('')
+    .transform((s) =>
+      s
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.string().regex(/^\+\d{8,15}$/))),
+  /** Link in the follow-up invite: where patients get the CareLoop app. */
+  PATIENT_APP_URL: z.string().default('http://localhost:3000/app'),
   /** Master kill switch for automated patient contact. Must stay false outside a reviewed pilot. */
   OUTREACH_ENABLED: bool,
   /** Languages staff may create cases in and CareLoop may contact patients in. */
@@ -106,6 +134,14 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   }
   if (cfg.OUTREACH_ENABLED && cfg.APP_ENV !== 'pilot') {
     throw new Error('OUTREACH_ENABLED=true is only allowed when APP_ENV=pilot');
+  }
+  if (
+    cfg.MESSAGING_ADAPTER === 'whatsapp' &&
+    (!cfg.WHATSAPP_PHONE_NUMBER_ID || !cfg.WHATSAPP_ACCESS_TOKEN)
+  ) {
+    throw new Error(
+      'MESSAGING_ADAPTER=whatsapp needs WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN',
+    );
   }
   return cfg;
 }
