@@ -1,0 +1,18 @@
+{
+  "name": "@careloop/ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@careloop/contracts": "workspace:*",
+    "@google/genai": "3.6.1",
+    "zod": "4.6.7"
+  }
+}

@@ -155,3 +155,14 @@ vite.config.ts.timestamp-*
 .nx/cache
 .nx/workspace-data
 .nx/migrate-runs
+
+# CareLoop
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+infra/.terraform/
+infra/*.tfstate*
+emulator-data/
+infra/**/*.tfvars
+!infra/**/*.tfvars.example

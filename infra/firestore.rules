@@ -1,0 +1,11 @@
+rules_version = '2';
+// CareLoop denies ALL direct client access. Browsers talk only to the API,
+// which authorizes every command server-side (MVP spec §09). Server SDKs
+// bypass these rules, so tenant isolation lives in the domain layer.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

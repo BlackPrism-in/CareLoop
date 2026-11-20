@@ -1,0 +1,11 @@
+# Pilot project is SEPARATE from demo/staging. Outreach stays false until Phase 7 sign-off.
+project_id       = "<pilot-project-id>"
+app_env          = "pilot"
+region           = "asia-south1"
+outreach_enabled = false
+model_ids = {
+  intake       = "<verified>"
+  coordination = "<verified>"
+  verification = "<verified>"
+  live         = "<verified>"
+}

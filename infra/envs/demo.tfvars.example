@@ -1,0 +1,10 @@
+project_id       = "<demo-project-id>"
+app_env          = "demo"
+region           = "asia-south1"
+outreach_enabled = false
+model_ids = {
+  intake       = "<verified>"
+  coordination = "<verified>"
+  verification = "<verified>"
+  live         = "<verified>"
+}

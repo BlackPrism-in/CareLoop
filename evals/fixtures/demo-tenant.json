@@ -1,0 +1,335 @@
+{
+  "$comment": "SYNTHETIC DATA ONLY. No real patients, staff, phone numbers or clinical content.",
+  "tenant": {
+    "tenantId": "t_demo_siliguri",
+    "displayName": "Siliguri Demo Lab",
+    "timeZone": "Asia/Kolkata",
+    "outreachPaused": false,
+    "simulation": true
+  },
+  "sites": [
+    {
+      "siteId": "site_demo_main",
+      "displayName": "Demo Lab — Main Branch",
+      "timeZone": "Asia/Kolkata",
+      "contactWindow": {
+        "start": "09:00",
+        "end": "19:00"
+      }
+    }
+  ],
+  "members": [
+    {
+      "uid": "staff_demo_owner",
+      "displayName": "Demo Owner",
+      "email": "owner@demo.careloop.test",
+      "roleSet": ["OWNER"],
+      "status": "ACTIVE",
+      "permittedSiteIds": ["site_demo_main"]
+    },
+    {
+      "uid": "staff_demo_reviewer",
+      "displayName": "Demo Reviewer",
+      "email": "reviewer@demo.careloop.test",
+      "roleSet": ["REVIEWER"],
+      "status": "ACTIVE",
+      "permittedSiteIds": ["site_demo_main"]
+    },
+    {
+      "uid": "staff_demo_01",
+      "displayName": "Front Desk",
+      "email": "frontdesk@demo.careloop.test",
+      "roleSet": ["COORDINATOR"],
+      "status": "ACTIVE",
+      "permittedSiteIds": ["site_demo_main"]
+    },
+    {
+      "uid": "staff_demo_verifier",
+      "displayName": "Demo Verifier",
+      "email": "verifier@demo.careloop.test",
+      "roleSet": ["VERIFIER"],
+      "status": "ACTIVE",
+      "permittedSiteIds": ["site_demo_main"]
+    },
+    {
+      "uid": "staff_demo_auditor",
+      "displayName": "Demo Auditor",
+      "email": "auditor@demo.careloop.test",
+      "roleSet": ["AUDITOR"],
+      "status": "ACTIVE",
+      "permittedSiteIds": ["site_demo_main"]
+    }
+  ],
+  "patients": [
+    {
+      "patientId": "pat_demo_01",
+      "externalRef": "patient_ref_demo_01",
+      "alias": "Patient A",
+      "contactMasked": "+91 •••••• 0101",
+      "ageEligibility": "ADULT_CONFIRMED",
+      "language": "hi-IN",
+      "identityMethodRef": "supervised_demo"
+    },
+    {
+      "patientId": "pat_demo_02",
+      "externalRef": "patient_ref_demo_02",
+      "alias": "Patient B",
+      "contactMasked": "+91 •••••• 0102",
+      "ageEligibility": "ADULT_CONFIRMED",
+      "language": "en-IN",
+      "identityMethodRef": "supervised_demo"
+    },
+    {
+      "patientId": "pat_demo_03",
+      "externalRef": "patient_ref_demo_03",
+      "alias": "Patient C",
+      "contactMasked": "+91 •••••• 0103",
+      "ageEligibility": "ADULT_CONFIRMED",
+      "language": "hi-IN",
+      "identityMethodRef": "supervised_demo"
+    },
+    {
+      "patientId": "pat_demo_04",
+      "externalRef": "patient_ref_demo_04",
+      "alias": "Patient D",
+      "contactMasked": "+91 •••••• 0104",
+      "ageEligibility": "UNKNOWN",
+      "language": "en-IN",
+      "identityMethodRef": "supervised_demo"
+    }
+  ],
+  "consents": [
+    {
+      "consentId": "consent_demo_01",
+      "patientId": "pat_demo_01",
+      "purpose": "FOLLOW_UP_COORDINATION",
+      "channels": ["BROWSER_VOICE"],
+      "noticeVersion": "demo-notice-v1",
+      "recordedBy": "staff_demo_01",
+      "proofRef": "demo_proof_01",
+      "grantedAt": "2026-11-18T04:30:00Z",
+      "revokedAt": null,
+      "expiresAt": null,
+      "version": 1
+    },
+    {
+      "consentId": "consent_demo_02",
+      "patientId": "pat_demo_02",
+      "purpose": "FOLLOW_UP_COORDINATION",
+      "channels": ["BROWSER_VOICE"],
+      "noticeVersion": "demo-notice-v1",
+      "recordedBy": "staff_demo_01",
+      "proofRef": "demo_proof_02",
+      "grantedAt": "2026-11-18T04:35:00Z",
+      "revokedAt": null,
+      "expiresAt": null,
+      "version": 1
+    },
+    {
+      "consentId": "consent_demo_03",
+      "patientId": "pat_demo_03",
+      "purpose": "FOLLOW_UP_COORDINATION",
+      "channels": ["BROWSER_VOICE"],
+      "noticeVersion": "demo-notice-v1",
+      "recordedBy": "staff_demo_01",
+      "proofRef": "demo_proof_03",
+      "grantedAt": "2026-11-18T04:40:00Z",
+      "revokedAt": "2026-11-19T06:00:00Z",
+      "expiresAt": null,
+      "version": 2
+    },
+    {
+      "consentId": "consent_demo_04",
+      "patientId": "pat_demo_04",
+      "purpose": "FOLLOW_UP_COORDINATION",
+      "channels": ["BROWSER_VOICE"],
+      "noticeVersion": "demo-notice-v1",
+      "recordedBy": "staff_demo_01",
+      "proofRef": "demo_proof_04",
+      "grantedAt": "2026-11-18T04:45:00Z",
+      "revokedAt": null,
+      "expiresAt": null,
+      "version": 1
+    }
+  ],
+  "sources": [
+    {
+      "sourceId": "src_demo_01",
+      "sourceAuthority": "demo_clinic",
+      "documentType": "FORM",
+      "reference": "order_demo_01"
+    },
+    {
+      "sourceId": "src_demo_02",
+      "sourceAuthority": "demo_clinic",
+      "documentType": "FORM",
+      "reference": "order_demo_02"
+    },
+    {
+      "sourceId": "src_demo_03",
+      "sourceAuthority": "demo_clinic",
+      "documentType": "FORM",
+      "reference": "order_demo_03"
+    },
+    {
+      "sourceId": "src_demo_04",
+      "sourceAuthority": "demo_pathologist",
+      "documentType": "FORM",
+      "reference": "order_demo_04"
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "CL-1042",
+      "siteId": "site_demo_main",
+      "patientId": "pat_demo_01",
+      "sourceId": "src_demo_01",
+      "consentId": "consent_demo_01",
+      "actionType": "CONSULTATION",
+      "actionText": "Arrange the approved clinic consultation",
+      "dueAt": "2026-11-24T12:30:00Z",
+      "ownerId": "staff_demo_01",
+      "language": "hi-IN",
+      "approvalRevision": 0,
+      "approvalHash": null,
+      "workflowState": "DRAFT",
+      "outreachDisposition": "NOT_STARTED",
+      "handoffState": "NONE",
+      "evidenceState": "NONE",
+      "bookingState": "NONE",
+      "automationPausedReason": "REVIEW_REQUIRED",
+      "fingerprint": "8f6ccb72599e0eda04dd5d7462b6a7bf2f8512f67920e7a31100bc08defd650a",
+      "version": 1,
+      "createdBy": "staff_demo_01",
+      "createdAt": "2026-11-20T03:40:00Z",
+      "updatedAt": "2026-11-20T03:40:00Z"
+    },
+    {
+      "caseId": "CL-1043",
+      "siteId": "site_demo_main",
+      "patientId": "pat_demo_02",
+      "sourceId": "src_demo_02",
+      "consentId": "consent_demo_02",
+      "actionType": "ORDERED_TEST",
+      "actionText": "Schedule the already-ordered repeat test collection",
+      "dueAt": "2026-11-26T12:30:00Z",
+      "ownerId": "staff_demo_01",
+      "language": "en-IN",
+      "approvalRevision": 0,
+      "approvalHash": null,
+      "workflowState": "DRAFT",
+      "outreachDisposition": "NOT_STARTED",
+      "handoffState": "NONE",
+      "evidenceState": "NONE",
+      "bookingState": "NONE",
+      "automationPausedReason": "REVIEW_REQUIRED",
+      "fingerprint": "bf53a29f654f64102ba7ed1f8f92e48992d8ecfd5665bb4ba29b0d9ab14c5680",
+      "version": 1,
+      "createdBy": "staff_demo_01",
+      "createdAt": "2026-11-20T03:45:00Z",
+      "updatedAt": "2026-11-20T03:45:00Z"
+    },
+    {
+      "caseId": "CL-1044",
+      "siteId": "site_demo_main",
+      "patientId": "pat_demo_03",
+      "sourceId": "src_demo_03",
+      "consentId": "consent_demo_03",
+      "actionType": "CONSULTATION",
+      "actionText": "Arrange the approved clinic consultation",
+      "dueAt": "2026-11-25T12:30:00Z",
+      "ownerId": "staff_demo_01",
+      "language": "hi-IN",
+      "approvalRevision": 0,
+      "approvalHash": null,
+      "workflowState": "DRAFT",
+      "outreachDisposition": "NOT_STARTED",
+      "handoffState": "NONE",
+      "evidenceState": "NONE",
+      "bookingState": "NONE",
+      "automationPausedReason": "CONSENT",
+      "fingerprint": "bd56c0f22bb1c8c9f4a4d263eae98a1b4759c96a2da84f0330f0a5dbed0abe08",
+      "version": 1,
+      "createdBy": "staff_demo_01",
+      "createdAt": "2026-11-20T03:50:00Z",
+      "updatedAt": "2026-11-20T03:50:00Z"
+    },
+    {
+      "caseId": "CL-1045",
+      "siteId": "site_demo_main",
+      "patientId": "pat_demo_04",
+      "sourceId": "src_demo_04",
+      "consentId": "consent_demo_04",
+      "actionType": "ORDERED_TEST",
+      "actionText": "Schedule the already-ordered sample collection",
+      "dueAt": "2026-11-27T12:30:00Z",
+      "ownerId": "staff_demo_01",
+      "language": "en-IN",
+      "approvalRevision": 0,
+      "approvalHash": null,
+      "workflowState": "DRAFT",
+      "outreachDisposition": "NOT_STARTED",
+      "handoffState": "NONE",
+      "evidenceState": "NONE",
+      "bookingState": "NONE",
+      "automationPausedReason": "REVIEW_REQUIRED",
+      "fingerprint": "99a5dfe1b13621e1f3a3be625b73a3b74d5b2939370e3c8bad7a4f4bb67e4737",
+      "version": 1,
+      "createdBy": "staff_demo_01",
+      "createdAt": "2026-11-20T03:55:00Z",
+      "updatedAt": "2026-11-20T03:55:00Z"
+    }
+  ],
+  "slots": [
+    {
+      "slotId": "slot_demo_c1",
+      "siteId": "site_demo_main",
+      "actionType": "CONSULTATION",
+      "location": "Demo Clinic, Room 2",
+      "startsAt": "2026-11-23T05:30:00Z",
+      "endsAt": "2026-11-23T06:00:00Z",
+      "capacity": 1,
+      "reserved": 0
+    },
+    {
+      "slotId": "slot_demo_c2",
+      "siteId": "site_demo_main",
+      "actionType": "CONSULTATION",
+      "location": "Demo Clinic, Room 2",
+      "startsAt": "2026-11-23T11:00:00Z",
+      "endsAt": "2026-11-23T11:30:00Z",
+      "capacity": 1,
+      "reserved": 0
+    },
+    {
+      "slotId": "slot_demo_c3",
+      "siteId": "site_demo_main",
+      "actionType": "CONSULTATION",
+      "location": "Demo Clinic, Room 2",
+      "startsAt": "2026-11-24T12:00:00Z",
+      "endsAt": "2026-11-24T12:30:00Z",
+      "capacity": 1,
+      "reserved": 0
+    },
+    {
+      "slotId": "slot_demo_t1",
+      "siteId": "site_demo_main",
+      "actionType": "ORDERED_TEST",
+      "location": "Demo Lab collection desk",
+      "startsAt": "2026-11-23T03:00:00Z",
+      "endsAt": "2026-11-23T03:15:00Z",
+      "capacity": 2,
+      "reserved": 0
+    },
+    {
+      "slotId": "slot_demo_t2",
+      "siteId": "site_demo_main",
+      "actionType": "ORDERED_TEST",
+      "location": "Home collection (Siliguri)",
+      "startsAt": "2026-11-24T02:30:00Z",
+      "endsAt": "2026-11-24T03:30:00Z",
+      "capacity": 1,
+      "reserved": 0
+    }
+  ]
+}

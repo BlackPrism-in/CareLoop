@@ -1,0 +1,25 @@
+{
+  "name": "@careloop/voice",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@careloop/adapters": "workspace:*",
+    "@careloop/ai": "workspace:*",
+    "@careloop/contracts": "workspace:*",
+    "@careloop/observability": "workspace:*",
+    "ws": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/ws": "8.18.2",
+    "tsup": "9.0.0",
+    "tsx": "4.23.15"
+  },
+  "scripts": {
+    "dev": "PORT=8082 tsx watch --env-file-if-exists=../../.env.local src/server.ts",
+    "build": "tsup",
+    "start": "node dist/server.js",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  }
+}
