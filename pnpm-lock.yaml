@@ -156,6 +156,37 @@ importers:
         specifier: 4.23.15
         version: 4.23.15
 
+  evals:
+    dependencies:
+      '@careloop/adapters':
+        specifier: workspace:*
+        version: link:../packages/adapters
+      '@careloop/ai':
+        specifier: workspace:*
+        version: link:../packages/ai
+      '@careloop/contracts':
+        specifier: workspace:*
+        version: link:../packages/contracts
+      '@careloop/domain':
+        specifier: workspace:*
+        version: link:../packages/domain
+      '@careloop/jobs':
+        specifier: workspace:*
+        version: link:../packages/jobs
+      '@careloop/observability':
+        specifier: workspace:*
+        version: link:../packages/observability
+      '@careloop/voice':
+        specifier: workspace:*
+        version: link:../apps/voice
+      firebase-admin:
+        specifier: 14.5.1
+        version: 14.5.1(@firebase/app-compat@0.5.23)(@firebase/app@0.16.7)
+    devDependencies:
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
+
   packages/adapters:
     dependencies:
       '@careloop/contracts':
@@ -227,6 +258,9 @@ importers:
 
   scripts:
     dependencies:
+      '@careloop/adapters':
+        specifier: workspace:*
+        version: link:../packages/adapters
       '@careloop/ai':
         specifier: workspace:*
         version: link:../packages/ai
@@ -236,10 +270,22 @@ importers:
       '@careloop/domain':
         specifier: workspace:*
         version: link:../packages/domain
+      '@careloop/jobs':
+        specifier: workspace:*
+        version: link:../packages/jobs
+      '@careloop/observability':
+        specifier: workspace:*
+        version: link:../packages/observability
       firebase-admin:
         specifier: 14.5.1
         version: 14.5.1(@firebase/app-compat@0.5.23)(@firebase/app@0.16.7)
+      ws:
+        specifier: 8.23.0
+        version: 8.23.0
     devDependencies:
+      '@types/ws':
+        specifier: 8.18.2
+        version: 8.18.2
       tsx:
         specifier: 4.23.15
         version: 4.23.15

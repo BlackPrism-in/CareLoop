@@ -1,0 +1,23 @@
+{
+  "name": "@careloop/evals",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "eval": "firebase emulators:exec --only firestore --project demo-careloop-evals --config ../firebase.json \"tsx src/run.ts\""
+  },
+  "dependencies": {
+    "@careloop/adapters": "workspace:*",
+    "@careloop/ai": "workspace:*",
+    "@careloop/contracts": "workspace:*",
+    "@careloop/domain": "workspace:*",
+    "@careloop/jobs": "workspace:*",
+    "@careloop/observability": "workspace:*",
+    "@careloop/voice": "workspace:*",
+    "firebase-admin": "14.5.1"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15"
+  }
+}

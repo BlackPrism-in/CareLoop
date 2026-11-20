@@ -28,6 +28,7 @@ import { POST as patientSession } from '../app/v1/p/session/route';
 import { GET as patientMe } from '../app/v1/p/me/route';
 import { POST as patientAction } from '../app/v1/p/actions/route';
 import { POST as handoffAction } from '../app/v1/handoffs/[id]/[action]/route';
+import { GET as report } from '../app/v1/reports/route';
 
 /**
  * Exercises the real route handlers against the Auth + Firestore emulators
@@ -1047,5 +1048,32 @@ describe('staff API on emulators', () => {
     );
     expect(ack.status).toBe(200);
     expect((await ack.json()).workflowState).toBe('AWAITING_BOOKING'); // acknowledgment is not completion
+  });
+
+  it('MVP-12: reports keep bookings, self-reports and verified completions separate', async () => {
+    const day = (ms: number) => new Date(Date.now() + ms).toISOString().slice(0, 10);
+    const r = await (
+      await report(
+        req(`/v1/reports?from=${day(-86_400_000)}&to=${day(40 * 86_400_000)}&cohort=due`, {
+          as: 'staff_demo_auditor',
+        }),
+        noParams,
+      )
+    ).json();
+    expect(r.separateCounts.verifiedCompleted).toBeGreaterThanOrEqual(1); // ORD-EV was attested
+    expect(r.separateCounts.selfReportedOnly).toBeGreaterThanOrEqual(1); // ORD-EV2 self-report
+    // Every test case is still inside its due date, so nothing is in the denominator yet.
+    expect(r.primary.denominator).toBe(0);
+    expect(r.primary.rate).toBeNull();
+    expect(r.primary.exclusions.followUpWindowStillOpen).toBeGreaterThan(0);
+    const other = await (
+      await report(
+        req(`/v1/reports?from=${day(-86_400_000)}&to=${day(40 * 86_400_000)}`, {
+          as: 'other_reviewer',
+        }),
+        noParams,
+      )
+    ).json();
+    expect(other.cohort.cases).toBe(0);
   });
 });

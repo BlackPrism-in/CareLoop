@@ -1,0 +1,104 @@
+name: deploy-staging
+
+# Builds, scans and deploys the three services to the STAGING project after CI
+# passes on main, then runs the smoke test. Does nothing until the repository
+# variables below are set (see docs/DEPLOY.md). Never deploys the pilot project.
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # Workload Identity Federation, no long-lived keys
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+env:
+  PROJECT: ${{ vars.STAGING_GCP_PROJECT }}
+  REGION: ${{ vars.STAGING_REGION || 'asia-south1' }}
+
+jobs:
+  deploy:
+    if: ${{ vars.STAGING_GCP_PROJECT != '' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.STAGING_WIF_PROVIDER }}
+          service_account: ${{ vars.STAGING_DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+
+      - name: Build, scan and push images
+        id: images
+        run: |
+          set -euo pipefail
+          REG="$REGION-docker.pkg.dev/$PROJECT/careloop"
+          for svc in web-api worker voice; do
+            docker build -f "apps/$svc/Dockerfile" \
+              --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="${{ vars.STAGING_FIREBASE_WEB_API_KEY }}" \
+              --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="$PROJECT.firebaseapp.com" \
+              --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="$PROJECT" \
+              -t "$REG/$svc:${GITHUB_SHA}" .
+            echo "IMAGE_${svc//-/_}=$REG/$svc:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          done
+
+      - name: Scan images (fail on fixable HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE_web_api }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE_worker }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE_voice }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Push and deploy by digest
+        run: |
+          set -euo pipefail
+          for svc in web-api worker voice; do
+            var="IMAGE_${svc//-/_}"; image="${!var}"
+            docker push "$image"
+            digest=$(gcloud artifacts docker images describe "$image" --format='value(image_summary.fully_qualified_digest)')
+            gcloud run deploy "careloop-$svc" --image "$digest" --region "$REGION" --project "$PROJECT" --quiet
+          done
+
+      - name: Firestore rules and indexes
+        run: npx --yes firebase-tools@15.22.3 deploy --only firestore:rules,firestore:indexes --project "$PROJECT" --non-interactive
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Smoke test
+        env:
+          WEB_URL: ${{ vars.STAGING_WEB_URL }}
+          VOICE_URL: ${{ vars.STAGING_VOICE_URL }}
+          FIREBASE_WEB_API_KEY: ${{ vars.STAGING_FIREBASE_WEB_API_KEY }}
+          SMOKE_STAFF_EMAIL: ${{ secrets.STAGING_SMOKE_STAFF_EMAIL }}
+          SMOKE_STAFF_PASSWORD: ${{ secrets.STAGING_SMOKE_STAFF_PASSWORD }}
+        run: pnpm --filter @careloop/scripts smoke

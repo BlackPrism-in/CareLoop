@@ -4,18 +4,25 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@careloop/adapters": "workspace:*",
     "@careloop/ai": "workspace:*",
     "@careloop/contracts": "workspace:*",
     "@careloop/domain": "workspace:*",
-    "firebase-admin": "14.5.1"
+    "@careloop/jobs": "workspace:*",
+    "@careloop/observability": "workspace:*",
+    "firebase-admin": "14.5.1",
+    "ws": "8.23.0"
   },
   "devDependencies": {
+    "@types/ws": "8.18.2",
     "tsx": "4.23.15"
   },
   "scripts": {
     "seed": "tsx --env-file-if-exists=../.env.local src/seed.ts",
     "check-models": "tsx --env-file-if-exists=../.env.local src/check-models.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "demo:reset": "tsx --env-file-if-exists=../.env.local src/demo-reset.ts",
+    "smoke": "tsx src/smoke.ts"
   }
 }

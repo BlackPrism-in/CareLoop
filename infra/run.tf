@@ -1,4 +1,8 @@
 resource "google_cloud_run_v2_service" "web_api" {
+  # Images are deployed by the pipeline (by digest); Terraform owns everything else.
+  lifecycle {
+    ignore_changes = [template[0].containers[0].image, client, client_version]
+  }
   name     = "careloop-web-api"
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"
@@ -36,6 +40,10 @@ resource "google_cloud_run_v2_service" "web_api" {
 }
 
 resource "google_cloud_run_v2_service" "worker" {
+  # Images are deployed by the pipeline (by digest); Terraform owns everything else.
+  lifecycle {
+    ignore_changes = [template[0].containers[0].image, client, client_version]
+  }
   name     = "careloop-worker"
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL" # authenticated: no allUsers invoker binding
@@ -64,6 +72,10 @@ resource "google_cloud_run_v2_service" "worker" {
 }
 
 resource "google_cloud_run_v2_service" "voice" {
+  # Images are deployed by the pipeline (by digest); Terraform owns everything else.
+  lifecycle {
+    ignore_changes = [template[0].containers[0].image, client, client_version]
+  }
   name     = "careloop-voice"
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"

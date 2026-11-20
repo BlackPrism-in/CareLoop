@@ -357,6 +357,25 @@ export function commandSuite(name: string, backend: () => TestBackend) {
       expect((await events()).at(-1)?.eventType).toBe('INTERACTION_ENDED');
     });
 
+    it('ending a call after an opt-out records audio but never undoes the suppression', async () => {
+      await d.create();
+      await d.approve();
+      await d.dispatch();
+      d.track(await svc.optOut(AGENT, d.req({ channel: 'ALL' as const })));
+      const r = d.track(
+        await svc.recordInteractionEnded(
+          SYSTEM,
+          d.req({ interactionId: 'i', audioSeconds: 30, outcome: 'REACHED' as const }),
+        ),
+      );
+      expect(r.outreachDisposition).toBe('OPTED_OUT');
+      expect((await getCase())?.audioSecondsUsed).toBe(30);
+      await rejects(
+        svc.recordContactOutcome(SYSTEM, d.req({ outcome: 'REACHED' as const, audioSeconds: 0 })),
+        'PATIENT_SUPPRESSED',
+      );
+    });
+
     // ---- MVP-04/05 booking ---------------------------------------------------
 
     it('MVP-04: a booking request needs explicit patient confirmation of the slot', async () => {

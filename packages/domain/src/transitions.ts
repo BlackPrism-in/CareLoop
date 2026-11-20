@@ -235,6 +235,8 @@ export function recordContactOutcome(
   requireState(c, ['CONTACTING', 'AWAITING_BOOKING'], 'RECORD_CONTACT_OUTCOME');
   if (!Number.isInteger(input.audioSeconds) || input.audioSeconds < 0)
     throw guardFailed('INVALID_AUDIO_SECONDS');
+  // A suppression (opt-out, decline) is never overwritten by a later contact outcome.
+  if (SUPPRESSED.includes(c.outreachDisposition)) throw guardFailed('PATIENT_SUPPRESSED');
   let outcome: OutreachDisposition = input.outcome;
   if (outcome === 'RETRY_SCHEDULED' && c.contactAttempts >= input.maxContactAttempts)
     outcome = 'UNREACHABLE';
@@ -281,7 +283,12 @@ export function recordInteractionEnded(
   }
   if (!Number.isInteger(input.audioSeconds) || input.audioSeconds < 0)
     throw guardFailed('INVALID_AUDIO_SECONDS');
-  if (input.outcome && c.workflowState === 'CONTACTING') {
+  // After an opt-out or decline only billed audio is recorded; the suppression stands.
+  if (
+    input.outcome &&
+    c.workflowState === 'CONTACTING' &&
+    !SUPPRESSED.includes(c.outreachDisposition)
+  ) {
     const t = recordContactOutcome(c, {
       outcome: input.outcome,
       audioSeconds: input.audioSeconds,

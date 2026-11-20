@@ -27,5 +27,9 @@
     "test": "vitest run --passWithNoTests",
     "dev:watch": "PORT=8082 tsx watch --env-file-if-exists=../../.env.local src/server.ts",
     "test:emulator": "firebase emulators:exec --only firestore --project demo-careloop-voice --config ../../firebase.json \"vitest run --config vitest.emulator.config.ts\""
+  },
+  "exports": {
+    "./controller": "./src/controller.ts",
+    "./live": "./src/live.ts"
   }
 }
