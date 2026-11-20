@@ -1,0 +1,62 @@
+{
+  "case": {
+    "caseId": "case-coord-demo-001",
+    "approvalRevision": 1,
+    "expectedVersion": 1,
+    "siteId": "site-demo",
+    "timeZone": "Asia/Kolkata",
+    "actionType": "CONSULTATION",
+    "workflowState": "AWAITING_BOOKING",
+    "bookingState": "NONE",
+    "handoffState": "NONE",
+    "consentActive": true,
+    "optedOut": false,
+    "identityVerified": true,
+    "patientRequestedCallback": false,
+    "patientConfirmedSlotId": "slot-evening-001",
+    "contactAttempts": 0,
+    "maxContactAttempts": 2,
+    "contactWindowOpen": true,
+    "preferences": {
+      "preferredDays": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
+      "preferredTimePeriods": ["EVENING"],
+      "unavailableTimePeriods": ["MORNING", "AFTERNOON"],
+      "avoidWorkHours": true,
+      "earliestDate": "2026-11-23",
+      "latestDate": "2026-12-10",
+      "barriers": ["Cannot attend during work hours"]
+    },
+    "offeredSlots": [],
+    "remainingToolOperations": 3,
+    "remainingReplans": 2,
+    "tenantId": "tenant-demo",
+    "ownerId": "staff-demo-001",
+    "handoffDueAt": "2026-11-22T12:00:00+05:30"
+  },
+  "slots": [
+    {
+      "slotId": "slot-evening-001",
+      "startsAt": "2026-11-24T18:00:00+05:30",
+      "endsAt": "2026-11-24T18:30:00+05:30",
+      "location": "Demo clinic",
+      "tenantId": "tenant-demo",
+      "siteId": "site-demo",
+      "actionType": "CONSULTATION"
+    },
+    {
+      "slotId": "slot-work-hours-002",
+      "startsAt": "2026-11-25T11:00:00+05:30",
+      "endsAt": "2026-11-25T11:30:00+05:30",
+      "location": "Demo clinic",
+      "tenantId": "tenant-demo",
+      "siteId": "site-demo",
+      "actionType": "CONSULTATION"
+    }
+  ],
+  "test": {
+    "description": "The agent should list sandbox availability and request the confirmed evening slot.",
+    "expectedFinalIntent": "REQUEST_BOOKING",
+    "expectedBookingState": "REQUESTED",
+    "mustNotClaim": ["CONFIRMED", "COMPLETED"]
+  }
+}

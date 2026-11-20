@@ -6,4 +6,5 @@ export * from './agent';
 export * from './config';
 export * from './records';
 export * from './intake';
+export * from './coordination';
 export * from './fixtures';
