@@ -32,9 +32,21 @@ importers:
       '@careloop/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@careloop/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@careloop/jobs':
+        specifier: workspace:*
+        version: link:../../packages/jobs
       '@careloop/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@google/genai':
+        specifier: 3.6.1
+        version: 3.6.1
+      firebase-admin:
+        specifier: 14.5.1
+        version: 14.5.1(@firebase/app-compat@0.5.23)(@firebase/app@0.16.7)
       ws:
         specifier: 8.23.0
         version: 8.23.0
@@ -54,6 +66,9 @@ importers:
       '@careloop/adapters':
         specifier: workspace:*
         version: link:../../packages/adapters
+      '@careloop/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@careloop/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

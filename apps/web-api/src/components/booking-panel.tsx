@@ -102,8 +102,8 @@ export function BookingPanel({
               Start contact (simulated session)
             </Button>
             <p className="text-xs text-[var(--muted)]">
-              Re-checks approval, permission, contact hours and the attempt budget first. The voice
-              agent arrives in Phase 4.
+              Re-checks approval, permission, contact hours and the attempt budget first. Then open
+              the call below, or record the patient&apos;s answer yourself.
             </p>
           </div>
         )}

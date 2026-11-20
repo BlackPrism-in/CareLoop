@@ -85,3 +85,9 @@ export const BookingListQuery = z.object({
 
 /** Slot id used with the manual adapter: staff arrange the time outside CareLoop. */
 export const STAFF_ARRANGED = 'STAFF_ARRANGED';
+
+export const VoiceSessionBody = z.strictObject({
+  caseId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+});
+
+export const IntakeBody = z.strictObject({ text: z.string().trim().min(20).max(8000) });

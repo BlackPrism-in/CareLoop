@@ -9,6 +9,7 @@ const LABEL: Record<string, string> = {
   CASE_APPROVED: 'Reviewer approved',
   CONTACT_DISPATCHED: 'Contact attempt started',
   CONTACT_OUTCOME_RECORDED: 'Contact outcome recorded',
+  INTERACTION_ENDED: 'Call ended',
   PATIENT_REQUEST_RECORDED: 'Patient request recorded',
   BOOKING_REQUESTED: 'Booking requested',
   BOOKING_CONFIRMED: 'Slot acknowledged',

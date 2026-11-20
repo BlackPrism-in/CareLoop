@@ -3,6 +3,8 @@ data "google_project" "this" {}
 locals {
   # Cloud Run's deterministic URL avoids a self-reference cycle for WORKER_URL.
   worker_url = "https://careloop-worker-${data.google_project.this.number}.${var.region}.run.app"
+  web_url    = "https://careloop-web-api-${data.google_project.this.number}.${var.region}.run.app"
+  voice_wss  = "wss://careloop-voice-${data.google_project.this.number}.${var.region}.run.app"
   services = [
     "run.googleapis.com",
     "firestore.googleapis.com",
@@ -36,6 +38,8 @@ locals {
     TASK_QUEUE_MODE        = "cloud-tasks"
     TASKS_INVOKER_EMAIL    = google_service_account.svc["tasks-invoker"].email
     WORKER_URL             = local.worker_url
+    VOICE_ALLOWED_ORIGINS  = local.web_url
+    VOICE_PUBLIC_URL       = local.voice_wss
   }
 }
 

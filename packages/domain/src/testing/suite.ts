@@ -331,6 +331,32 @@ export function commandSuite(name: string, backend: () => TestBackend) {
       expect(c?.workflowState).not.toBe('COMPLETED_VERIFIED');
     });
 
+    it('a finished voice interaction records billed audio in any open state, and an outcome only while contacting', async () => {
+      await d.create();
+      await d.approve();
+      await d.dispatch();
+      const noAnswer = d.track(
+        await svc.recordInteractionEnded(
+          SYSTEM,
+          d.req({ interactionId: 'i1', audioSeconds: 12, outcome: 'RETRY_SCHEDULED' as const }),
+        ),
+      );
+      expect(noAnswer.outreachDisposition).toBe('RETRY_SCHEDULED');
+      await d.dispatch();
+      await d.patientBooks();
+      await d.requestBooking();
+      await d.confirmBooking();
+      const after = d.track(
+        await svc.recordInteractionEnded(
+          SYSTEM,
+          d.req({ interactionId: 'i2', audioSeconds: 95, outcome: 'REACHED' as const }),
+        ),
+      );
+      expect(after.workflowState).toBe('BOOKED');
+      expect((await getCase())?.audioSecondsUsed).toBe(107);
+      expect((await events()).at(-1)?.eventType).toBe('INTERACTION_ENDED');
+    });
+
     // ---- MVP-04/05 booking ---------------------------------------------------
 
     it('MVP-04: a booking request needs explicit patient confirmation of the slot', async () => {

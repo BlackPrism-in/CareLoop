@@ -253,6 +253,52 @@ export function recordContactOutcome(
   };
 }
 
+/**
+ * A voice interaction finished. Always records billed audio (budget, MVP spec
+ * §11). If the case is still CONTACTING, the outcome also sets the outreach
+ * disposition (e.g. no answer → retry or unreachable). Never implies completion.
+ */
+export function recordInteractionEnded(
+  c: Case,
+  input: {
+    interactionId: string;
+    audioSeconds: number;
+    outcome: ContactOutcome | null;
+    maxContactAttempts: number;
+  },
+): Transition {
+  if (
+    c.workflowState === 'DRAFT' ||
+    c.workflowState === 'CANCELLED' ||
+    c.workflowState === 'COMPLETED_VERIFIED'
+  ) {
+    throw guardFailed('INVALID_STATE_FOR_INTERACTION');
+  }
+  if (!Number.isInteger(input.audioSeconds) || input.audioSeconds < 0)
+    throw guardFailed('INVALID_AUDIO_SECONDS');
+  if (input.outcome && c.workflowState === 'CONTACTING') {
+    const t = recordContactOutcome(c, {
+      outcome: input.outcome,
+      audioSeconds: input.audioSeconds,
+      maxContactAttempts: input.maxContactAttempts,
+    });
+    return {
+      ...t,
+      eventType: 'INTERACTION_ENDED',
+      payload: { ...t.payload, interactionId: input.interactionId },
+    };
+  }
+  return {
+    patch: { audioSecondsUsed: c.audioSecondsUsed + input.audioSeconds },
+    eventType: 'INTERACTION_ENDED',
+    payload: {
+      interactionId: input.interactionId,
+      audioSeconds: input.audioSeconds,
+      outcome: input.outcome,
+    },
+  };
+}
+
 /** CONTACTING → AWAITING_BOOKING: identity verified for this interaction and an explicit patient request. */
 export function recordPatientRequest(
   c: Case,

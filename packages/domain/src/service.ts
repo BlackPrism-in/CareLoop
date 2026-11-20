@@ -427,6 +427,22 @@ export class CaseCommands {
     );
   }
 
+  recordInteractionEnded(
+    ctx: ActorContext,
+    req: CommandRequest<{
+      interactionId: string;
+      audioSeconds: number;
+      outcome: T.ContactOutcome | null;
+    }>,
+  ) {
+    return this.execute(ctx, 'recordInteractionEnded', req, (c) =>
+      T.recordInteractionEnded(c, {
+        ...req.input,
+        maxContactAttempts: this.deps.config.maxContactAttempts,
+      }),
+    );
+  }
+
   recordPatientRequest(
     ctx: ActorContext,
     req: CommandRequest<Parameters<typeof T.recordPatientRequest>[1]>,

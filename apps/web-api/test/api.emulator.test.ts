@@ -15,6 +15,8 @@ import { GET as listSlots } from '../app/v1/cases/[id]/slots/route';
 import { POST as bookingRequest } from '../app/v1/cases/[id]/booking-requests/route';
 import { GET as getOperation } from '../app/v1/operations/[id]/route';
 import { POST as replayJob } from '../app/v1/jobs/[id]/replay/route';
+import { POST as voiceSession } from '../app/v1/voice/sessions/route';
+import { consumeVoiceTicket } from '@careloop/domain';
 
 /**
  * Exercises the real route handlers against the Auth + Firestore emulators
@@ -515,5 +517,96 @@ describe('staff API on emulators', () => {
       params({ id: 'anything' }),
     );
     expect(missing.status).toBe(404);
+  });
+
+  it('Phase 4: voice tickets are coordinator-only, case-bound and never contain a model key', async () => {
+    const created = await (
+      await createCase(
+        req('/v1/cases', {
+          as: 'staff_demo_01',
+          method: 'POST',
+          key: 'k-voice',
+          body: newCaseBody('ORD-VOICE'),
+        }),
+        noParams,
+      )
+    ).json();
+    const id = created.caseId as string;
+    // Not in contact yet → refused.
+    const early = await voiceSession(
+      req('/v1/voice/sessions', { as: 'staff_demo_01', method: 'POST', body: { caseId: id } }),
+      noParams,
+    );
+    expect(early.status).toBe(422);
+    const v = (
+      await (
+        await approveCase(
+          req(`/v1/cases/${id}/approve`, {
+            as: 'staff_demo_reviewer',
+            method: 'POST',
+            key: 'v-a',
+            body: {
+              expectedVersion: created.version,
+              sourceAuthorityRef: 'ORD-VOICE',
+              checkedFields: CHECKS,
+            },
+          }),
+          params({ id }),
+        )
+      ).json()
+    ).version;
+    await contactRequest(
+      req(`/v1/cases/${id}/contact-requests`, {
+        as: 'staff_demo_01',
+        method: 'POST',
+        key: 'v-c',
+        body: { expectedVersion: v, channel: 'BROWSER_VOICE' },
+      }),
+      params({ id }),
+    );
+
+    expect(
+      (
+        await voiceSession(
+          req('/v1/voice/sessions', {
+            as: 'staff_demo_reviewer',
+            method: 'POST',
+            body: { caseId: id },
+          }),
+          noParams,
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await voiceSession(
+          req('/v1/voice/sessions', { as: 'other_reviewer', method: 'POST', body: { caseId: id } }),
+          noParams,
+        )
+      ).status,
+    ).toBe(403);
+
+    const res = await voiceSession(
+      req('/v1/voice/sessions', { as: 'staff_demo_01', method: 'POST', body: { caseId: id } }),
+      noParams,
+    );
+    expect(res.status).toBe(201);
+    const s = await res.json();
+    expect(Object.keys(s).sort()).toEqual([
+      'expiresAt',
+      'interactionId',
+      'simulation',
+      'ticket',
+      'wsUrl',
+    ]);
+    expect(JSON.stringify(s)).not.toMatch(/key|patient|alias/i);
+    const ticket = await consumeVoiceTicket(firestore(), s.ticket);
+    expect(ticket).toMatchObject({
+      tenantId: T,
+      caseId: id,
+      interactionId: s.interactionId,
+      createdBy: 'staff_demo_01',
+    });
+    expect(await consumeVoiceTicket(firestore(), s.ticket)).toBeNull();
   });
 });

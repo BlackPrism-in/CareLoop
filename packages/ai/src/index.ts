@@ -1,3 +1,7 @@
 export * from './models';
 export * from './client';
-// Phase 4 adds: agent prompts, tool schemas, proposal validation, eval hooks.
+export * from './model-client';
+export * from './prompts';
+export * from './intake';
+export * from './coordination';
+export * from './verification';

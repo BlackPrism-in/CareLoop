@@ -7,7 +7,11 @@
     "@careloop/adapters": "workspace:*",
     "@careloop/ai": "workspace:*",
     "@careloop/contracts": "workspace:*",
+    "@careloop/domain": "workspace:*",
+    "@careloop/jobs": "workspace:*",
     "@careloop/observability": "workspace:*",
+    "@google/genai": "3.6.1",
+    "firebase-admin": "14.5.1",
     "ws": "8.23.0"
   },
   "devDependencies": {
@@ -21,6 +25,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
-    "dev:watch": "PORT=8082 tsx watch --env-file-if-exists=../../.env.local src/server.ts"
+    "dev:watch": "PORT=8082 tsx watch --env-file-if-exists=../../.env.local src/server.ts",
+    "test:emulator": "firebase emulators:exec --only firestore --project demo-careloop-voice --config ../../firebase.json \"vitest run --config vitest.emulator.config.ts\""
   }
 }

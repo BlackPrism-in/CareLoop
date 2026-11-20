@@ -22,6 +22,7 @@ export type CommandName =
   | 'approve'
   | 'dispatchContact'
   | 'recordContactOutcome'
+  | 'recordInteractionEnded'
   | 'recordPatientRequest'
   | 'requestBooking'
   | 'confirmBooking'
@@ -64,6 +65,7 @@ export const PERMISSIONS: Record<CommandName, Rule> = {
   approve: staff('REVIEWER'),
   dispatchContact: plus(staff('COORDINATOR'), 'SYSTEM'),
   recordContactOutcome: plus(staff('COORDINATOR'), 'SYSTEM', 'AGENT'),
+  recordInteractionEnded: plus(staff('COORDINATOR'), 'SYSTEM', 'AGENT'),
   recordPatientRequest: plus(staff('COORDINATOR'), 'AGENT', 'PATIENT'),
   requestBooking: plus(staff('COORDINATOR'), 'AGENT', 'PATIENT'),
   confirmBooking: plus(staff('COORDINATOR'), 'SYSTEM', 'PROVIDER'),

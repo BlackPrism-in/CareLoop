@@ -83,5 +83,10 @@ const REASONS: Record<string, string> = {
   OUTREACH_DISABLED: 'Automated outreach is switched off for this environment.',
   OUTSIDE_CONTACT_WINDOW: "It's outside the lab's contact hours.",
   CONTACT_ATTEMPTS_EXHAUSTED: 'The contact attempt budget for this case is used up.',
+  MODEL_UNAVAILABLE:
+    'The AI model could not be reached. Fill in the form by hand, or check the Gemini configuration.',
+  CASE_NOT_IN_CONTACT: 'Start contact first.',
+  PATIENT_SUPPRESSED: 'The patient has opted out of automated contact.',
+  AUDIO_BUDGET_EXHAUSTED: 'The voice time budget for this case is used up.',
   IDENTITY_METHOD_NOT_CONFIGURED: 'No identity verification method is configured for this lab yet.',
 };

@@ -5,6 +5,7 @@ import { useAuth } from '@/components/auth-provider';
 import { HandoffBadge, OverdueBadge, PausedBadge, WorkflowStatus } from '@/components/status';
 import { BookingPanel } from '@/components/booking-panel';
 import { Timeline } from '@/components/timeline';
+import { VoicePanel } from '@/components/voice-panel';
 import { Button, Card, Field, inputClass, LoadError, Notice, Skeleton } from '@/components/ui';
 import { api, describeError } from '@/lib/api';
 import {
@@ -104,6 +105,12 @@ export default function CaseWorkspace({ params }: { params: Promise<{ id: string
           }}
         />
       )}
+
+      {hasRole('COORDINATOR') &&
+        ['CONTACTING', 'AWAITING_BOOKING'].includes(c.workflowState) &&
+        c.bookingState !== 'CONFIRMED' && (
+          <VoicePanel caseId={c.caseId} onEnded={() => void refresh()} />
+        )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card title="Approved action">

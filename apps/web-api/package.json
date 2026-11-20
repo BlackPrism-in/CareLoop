@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "@careloop/adapters": "workspace:*",
+    "@careloop/ai": "workspace:*",
     "@careloop/contracts": "workspace:*",
     "@careloop/domain": "workspace:*",
     "@careloop/jobs": "workspace:*",

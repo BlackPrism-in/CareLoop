@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type FormEvent } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { IntakeAssist } from '@/components/intake-assist';
 import { Button, Card, Field, inputClass, LoadError, Notice, Skeleton } from '@/components/ui';
 import { api, describeError } from '@/lib/api';
 import { localInputToIso } from '@/lib/format';
@@ -91,6 +92,20 @@ export default function NewFollowUp() {
         Enter an action a clinician has already approved. CareLoop does not choose tests or
         interpret results. The case stays a draft until a reviewer approves it.
       </Notice>
+      <IntakeAssist
+        onApply={(f) => {
+          setForm((cur) => ({
+            ...cur,
+            ...(f.actionType ? { actionType: f.actionType } : {}),
+            ...(f.actionText ? { actionText: f.actionText } : {}),
+            ...(f.dueDate ? { due: `${f.dueDate}T17:00` } : {}),
+            ...(f.sourceAuthority ? { sourceAuthority: f.sourceAuthority } : {}),
+            ...(f.reference ? { reference: f.reference } : {}),
+            ...(f.language ? { language: f.language } : {}),
+          }));
+          setKey(crypto.randomUUID());
+        }}
+      />
       <form onSubmit={submit} className="space-y-4">
         <Card title="Source">
           <div className="grid gap-3 md:grid-cols-2">
