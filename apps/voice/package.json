@@ -16,10 +16,11 @@
     "tsx": "4.23.15"
   },
   "scripts": {
-    "dev": "PORT=8082 tsx watch --env-file-if-exists=../../.env.local src/server.ts",
+    "dev": "PORT=8082 tsx --env-file-if-exists=../../.env.local src/server.ts",
     "build": "tsup",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "dev:watch": "PORT=8082 tsx watch --env-file-if-exists=../../.env.local src/server.ts"
   }
 }

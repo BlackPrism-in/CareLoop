@@ -8,8 +8,14 @@ loadEnvConfig(root);
 const config: NextConfig = {
   output: 'standalone',
   // Workspace packages ship TypeScript source.
-  transpilePackages: ['@careloop/contracts', '@careloop/domain', '@careloop/observability'],
-  serverExternalPackages: ['firebase-admin'],
+  transpilePackages: [
+    '@careloop/contracts',
+    '@careloop/domain',
+    '@careloop/observability',
+    '@careloop/jobs',
+    '@careloop/adapters',
+  ],
+  serverExternalPackages: ['firebase-admin', 'google-auth-library'],
   outputFileTracingRoot: root,
   poweredByHeader: false,
 };

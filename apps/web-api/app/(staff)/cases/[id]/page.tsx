@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { use, useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { HandoffBadge, OverdueBadge, PausedBadge, WorkflowStatus } from '@/components/status';
+import { BookingPanel } from '@/components/booking-panel';
 import { Timeline } from '@/components/timeline';
 import { Button, Card, Field, inputClass, LoadError, Notice, Skeleton } from '@/components/ui';
 import { api, describeError } from '@/lib/api';
@@ -24,13 +25,6 @@ const OUTREACH: Record<string, string> = {
   DECLINED: 'Declined',
   OPTED_OUT: 'Opted out',
   UNREACHABLE: 'Unreachable',
-};
-const BOOKING: Record<string, string> = {
-  NONE: 'No booking yet',
-  REQUESTED: 'Request sent — not yet confirmed',
-  CONFIRMED: 'Confirmed',
-  UNKNOWN: 'Outcome unknown — being reconciled',
-  CANCELLED: 'Cancelled',
 };
 
 export default function CaseWorkspace({ params }: { params: Promise<{ id: string }> }) {
@@ -139,15 +133,13 @@ export default function CaseWorkspace({ params }: { params: Promise<{ id: string
             )}
           </dl>
         </Card>
-        <Card title="Booking">
-          <p className="text-sm">{BOOKING[c.bookingState]}</p>
-          {c.bookedStartsAt && (
-            <p className="mt-1 text-sm font-medium">{formatDateTime(c.bookedStartsAt)}</p>
-          )}
-          <p className="mt-2 text-xs text-[var(--muted)]">
-            Booking requests and confirmations arrive in Phase 3.
-          </p>
-        </Card>
+        <BookingPanel
+          detail={data}
+          onChanged={(msg) => {
+            setToast(msg);
+            void refresh();
+          }}
+        />
         <Card title="Activity timeline">
           <Timeline events={data.events} names={names} />
         </Card>

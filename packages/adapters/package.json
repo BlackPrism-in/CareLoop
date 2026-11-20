@@ -11,6 +11,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@careloop/contracts": "workspace:*"
+    "@careloop/contracts": "workspace:*",
+    "@careloop/domain": "workspace:*",
+    "firebase-admin": "14.5.1"
   }
 }

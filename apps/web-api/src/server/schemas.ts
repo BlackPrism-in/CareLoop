@@ -47,3 +47,41 @@ export const ListCasesQuery = z.object({
   cursor: z.string().max(400).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
+
+const version = z.number().int().positive();
+
+export const ContactRequestBody = z.strictObject({
+  expectedVersion: version,
+  channel: z.literal('BROWSER_VOICE'),
+});
+
+/** Staff recording what the patient asked for on a staff-handled call. */
+export const PatientRequestBody = z.strictObject({
+  expectedVersion: version,
+  request: z.enum(['BOOK', 'CALLBACK']),
+});
+
+export const BookingRequestBody = z.strictObject({
+  expectedVersion: version,
+  slotId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+  /** The patient heard the date, time and location read back and said yes (MVP-04). */
+  patientConfirmedSlot: z.literal(true),
+});
+
+export const CancelBookingBody = z.strictObject({
+  expectedVersion: version,
+  reason: z.string().trim().min(1).max(300),
+});
+
+export const ManualConfirmBody = z.strictObject({
+  expectedVersion: version,
+  externalRef: z.string().trim().min(1).max(120),
+  startsAt: z.iso.datetime(),
+});
+
+export const BookingListQuery = z.object({
+  status: z.enum(['open', 'confirmed', 'closed']).default('open'),
+});
+
+/** Slot id used with the manual adapter: staff arrange the time outside CareLoop. */
+export const STAFF_ARRANGED = 'STAFF_ARRANGED';

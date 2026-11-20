@@ -5,7 +5,7 @@ const WORKFLOW: Record<string, { label: string; icon: string; tone: Tone }> = {
   DRAFT: { label: 'Needs approval', icon: '◔', tone: 'warn' },
   READY: { label: 'Approved', icon: '◑', tone: 'info' },
   CONTACTING: { label: 'Contacting', icon: '☏', tone: 'info' },
-  AWAITING_BOOKING: { label: 'Booking requested', icon: '⧗', tone: 'info' },
+  AWAITING_BOOKING: { label: 'Scheduling', icon: '⧗', tone: 'info' },
   BOOKED: { label: 'Booked · awaiting proof', icon: '▣', tone: 'info' },
   AWAITING_EVIDENCE: { label: 'Awaiting proof', icon: '⧗', tone: 'warn' },
   COMPLETED_VERIFIED: { label: 'Completed · verified', icon: '✓', tone: 'ok' },

@@ -47,6 +47,8 @@ export interface CommandResult {
   automationPausedReason: Case['automationPausedReason'];
   eventId: string;
   eventType: string;
+  /** Durable operation id; also the id of side effects it scheduled (e.g. the booking). Null for a duplicate-detection response. */
+  operationId: string | null;
   /** True when this response replays an earlier identical request. */
   replayed: boolean;
   /** e.g. DUPLICATE_SOURCE_ACTION when createCase returned an existing case. */

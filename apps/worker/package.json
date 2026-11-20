@@ -8,8 +8,10 @@
     "@careloop/ai": "workspace:*",
     "@careloop/contracts": "workspace:*",
     "@careloop/domain": "workspace:*",
+    "@careloop/jobs": "workspace:*",
     "@careloop/observability": "workspace:*",
     "@hono/node-server": "2.1.9",
+    "firebase-admin": "14.5.1",
     "hono": "4.13.19"
   },
   "devDependencies": {
@@ -17,10 +19,11 @@
     "tsx": "4.23.15"
   },
   "scripts": {
-    "dev": "PORT=8081 tsx watch --env-file-if-exists=../../.env.local src/server.ts",
+    "dev": "PORT=8081 tsx --env-file-if-exists=../../.env.local src/server.ts",
     "build": "tsup",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "dev:watch": "PORT=8081 tsx watch --env-file-if-exists=../../.env.local src/server.ts"
   }
 }

@@ -1,0 +1,22 @@
+{
+  "name": "@careloop/jobs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "test:emulator": "firebase emulators:exec --only firestore --project demo-careloop-jobs --config ../../firebase.json \"vitest run --config vitest.emulator.config.ts\""
+  },
+  "dependencies": {
+    "@careloop/adapters": "workspace:*",
+    "@careloop/contracts": "workspace:*",
+    "@careloop/domain": "workspace:*",
+    "@careloop/observability": "workspace:*",
+    "firebase-admin": "14.5.1",
+    "google-auth-library": "11.3.4"
+  }
+}

@@ -11,7 +11,7 @@ resource "google_cloud_run_v2_service" "web_api" {
     containers {
       image = var.images.web_api
       dynamic "env" {
-        for_each = merge(local.common_env, { WORKER_URL = google_cloud_run_v2_service.worker.uri })
+        for_each = local.common_env
         content {
           name  = env.key
           value = env.value

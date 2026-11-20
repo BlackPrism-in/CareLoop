@@ -9,6 +9,12 @@ import { GET as listCases, POST as createCase } from '../app/v1/cases/route';
 import { GET as getCase } from '../app/v1/cases/[id]/route';
 import { POST as approveCase } from '../app/v1/cases/[id]/approve/route';
 import { PATCH as editDraft } from '../app/v1/cases/[id]/draft/route';
+import { POST as contactRequest } from '../app/v1/cases/[id]/contact-requests/route';
+import { POST as patientRequest } from '../app/v1/cases/[id]/patient-requests/route';
+import { GET as listSlots } from '../app/v1/cases/[id]/slots/route';
+import { POST as bookingRequest } from '../app/v1/cases/[id]/booking-requests/route';
+import { GET as getOperation } from '../app/v1/operations/[id]/route';
+import { POST as replayJob } from '../app/v1/jobs/[id]/replay/route';
 
 /**
  * Exercises the real route handlers against the Auth + Firestore emulators
@@ -26,6 +32,9 @@ const T = fixture.tenant.tenantId;
 const OTHER = 't_other_lab';
 
 const tokens: Record<string, string> = {};
+// Relative to the real clock: these routes use wall-clock time.
+const DUE = new Date(Date.now() + 30 * 86_400_000).toISOString();
+const SLOT_AT = new Date(Date.now() + 3 * 86_400_000).toISOString();
 
 async function signIn(email: string): Promise<string> {
   const res = await fetch(
@@ -71,7 +80,7 @@ const newCaseBody = (reference: string) => ({
   source: { sourceAuthority: 'demo_clinic', reference },
   actionType: 'CONSULTATION',
   actionText: 'Arrange the approved clinic consultation',
-  dueAt: '2026-12-20T06:30:00.000Z',
+  dueAt: DUE,
   ownerId: 'staff_demo_01',
   language: 'hi-IN',
 });
@@ -85,7 +94,22 @@ beforeAll(async () => {
   const db = firestore();
   const batch = db.batch();
   batch.set(db.doc(tenantDoc(T)), fixture.tenant);
-  for (const s of fixture.sites) batch.set(db.doc(tenantRecord(T, 'sites', s.siteId)), s);
+  // Open all day so the test doesn't depend on the time it runs.
+  for (const s of fixture.sites)
+    batch.set(db.doc(tenantRecord(T, 'sites', s.siteId)), {
+      ...s,
+      contactWindow: { start: '00:00', end: '23:59' },
+    });
+  batch.set(db.doc(tenantRecord(T, 'slots', 'slot_api_1')), {
+    slotId: 'slot_api_1',
+    siteId: 'site_demo_main',
+    actionType: 'CONSULTATION',
+    location: 'Demo Clinic, Room 2',
+    startsAt: SLOT_AT,
+    endsAt: new Date(Date.parse(SLOT_AT) + 1_800_000).toISOString(),
+    capacity: 1,
+    reserved: 0,
+  });
   for (const m of fixture.members) batch.set(db.doc(tenantRecord(T, 'members', m.uid)), m);
   for (const p of fixture.patients) batch.set(db.doc(tenantRecord(T, 'patients', p.patientId)), p);
   for (const c of fixture.consents) batch.set(db.doc(tenantRecord(T, 'consents', c.consentId)), c);
@@ -350,5 +374,146 @@ describe('staff API on emulators', () => {
       await listCases(req('/v1/cases', { as: 'other_reviewer' }), noParams)
     ).json();
     expect(other.items).toHaveLength(0);
+  });
+
+  it('Phase 3: simulated contact → patient request → adapter slots → booking request (202, not yet booked)', async () => {
+    const body = newCaseBody('ORD-BOOK');
+    const created = await (
+      await createCase(
+        req('/v1/cases', { as: 'staff_demo_01', method: 'POST', key: 'k-book', body }),
+        noParams,
+      )
+    ).json();
+    const id = created.caseId as string;
+    const p = params({ id });
+    let v = (
+      await (
+        await approveCase(
+          req(`/v1/cases/${id}/approve`, {
+            as: 'staff_demo_reviewer',
+            method: 'POST',
+            key: 'b-a',
+            body: {
+              expectedVersion: created.version,
+              sourceAuthorityRef: 'ORD-BOOK',
+              checkedFields: CHECKS,
+            },
+          }),
+          p,
+        )
+      ).json()
+    ).version;
+
+    // Outreach is disabled in this environment; a synthetic lab's browser session is still allowed.
+    const contact = await contactRequest(
+      req(`/v1/cases/${id}/contact-requests`, {
+        as: 'staff_demo_01',
+        method: 'POST',
+        key: 'b-c',
+        body: { expectedVersion: v, channel: 'BROWSER_VOICE' },
+      }),
+      p,
+    );
+    expect(contact.status).toBe(202);
+    v = (await contact.json()).version;
+    // A reviewer can't start contact.
+    expect(
+      (
+        await contactRequest(
+          req(`/v1/cases/${id}/contact-requests`, {
+            as: 'staff_demo_reviewer',
+            method: 'POST',
+            key: 'b-c2',
+            body: { expectedVersion: v, channel: 'BROWSER_VOICE' },
+          }),
+          p,
+        )
+      ).status,
+    ).toBe(403);
+
+    const asked = await (
+      await patientRequest(
+        req(`/v1/cases/${id}/patient-requests`, {
+          as: 'staff_demo_01',
+          method: 'POST',
+          key: 'b-p',
+          body: { expectedVersion: v, request: 'BOOK' },
+        }),
+        p,
+      )
+    ).json();
+    expect(asked.workflowState).toBe('AWAITING_BOOKING');
+    v = asked.version;
+
+    const slots = await (
+      await listSlots(req(`/v1/cases/${id}/slots`, { as: 'staff_demo_01' }), p)
+    ).json();
+    expect(slots.adapter).toBe('sandbox');
+    expect(slots.slots.map((s: { slotId: string }) => s.slotId)).toContain('slot_api_1');
+
+    // MVP-04: a slot the adapter didn't offer is refused; so is a missing patient confirmation.
+    const invented = await bookingRequest(
+      req(`/v1/cases/${id}/booking-requests`, {
+        as: 'staff_demo_01',
+        method: 'POST',
+        key: 'b-x',
+        body: { expectedVersion: v, slotId: 'slot_made_up', patientConfirmedSlot: true },
+      }),
+      p,
+    );
+    expect(invented.status).toBe(422);
+    expect((await invented.json()).message).toBe('SLOT_NOT_OFFERED_BY_ADAPTER');
+    const unconfirmed = await bookingRequest(
+      req(`/v1/cases/${id}/booking-requests`, {
+        as: 'staff_demo_01',
+        method: 'POST',
+        key: 'b-y',
+        body: { expectedVersion: v, slotId: 'slot_api_1', patientConfirmedSlot: false },
+      }),
+      p,
+    );
+    expect(unconfirmed.status).toBe(400);
+
+    const booked = await bookingRequest(
+      req(`/v1/cases/${id}/booking-requests`, {
+        as: 'staff_demo_01',
+        method: 'POST',
+        key: 'b-b',
+        body: { expectedVersion: v, slotId: 'slot_api_1', patientConfirmedSlot: true },
+      }),
+      p,
+    );
+    expect(booked.status).toBe(202);
+    const r = await booked.json();
+    expect(r).toMatchObject({ workflowState: 'AWAITING_BOOKING', bookingState: 'REQUESTED' });
+    expect(r.operationId).toMatch(/^[a-f0-9]{64}$/);
+
+    const op = await getOperation(
+      req(`/v1/operations/${r.operationId}`, { as: 'staff_demo_auditor' }),
+      params({ id: r.operationId }),
+    );
+    expect(op.status).toBe(200);
+    expect(await op.json()).toMatchObject({ command: 'requestBooking', caseId: id });
+    expect(
+      (
+        await getOperation(
+          req(`/v1/operations/${r.operationId}`, { as: 'other_reviewer' }),
+          params({ id: r.operationId }),
+        )
+      ).status,
+    ).toBe(404);
+  });
+
+  it('only an owner can replay failed jobs', async () => {
+    const res = await replayJob(
+      req('/v1/jobs/anything/replay', { as: 'staff_demo_01', method: 'POST', body: {} }),
+      params({ id: 'anything' }),
+    );
+    expect(res.status).toBe(403);
+    const missing = await replayJob(
+      req('/v1/jobs/anything/replay', { as: 'staff_demo_owner', method: 'POST', body: {} }),
+      params({ id: 'anything' }),
+    );
+    expect(missing.status).toBe(404);
   });
 });

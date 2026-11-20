@@ -20,12 +20,20 @@ export interface AvailableSlot {
 }
 
 export type ReservationResult =
-  | { status: 'CONFIRMED'; externalRef: string; startsAt: string; simulation: boolean }
+  | {
+      status: 'CONFIRMED';
+      externalRef: string;
+      startsAt: string;
+      location: string;
+      simulation: boolean;
+    }
   | { status: 'CONFLICT'; reason: 'SLOT_TAKEN' | 'SLOT_INCOMPATIBLE' }
   /** Timeout / lost acknowledgment: the side effect may have happened. Reconcile, never blindly retry. */
   | { status: 'UNKNOWN' }
   /** Manual adapter: a staff booking task was created; case stays AWAITING_BOOKING. */
-  | { status: 'PENDING_STAFF'; taskId: string };
+  | { status: 'PENDING_STAFF'; taskId: string }
+  /** Reconciliation only: the provider has no reservation for this operation, so a new request is safe. */
+  | { status: 'NOT_FOUND' };
 
 export interface BookingAdapter {
   readonly kind: 'sandbox' | 'manual' | 'provider';
@@ -33,16 +41,17 @@ export interface BookingAdapter {
     ctx: AdapterContext,
     q: { siteId: string; actionType: ActionType; from: string; to: string },
   ): Promise<AvailableSlot[]>;
+  /** Idempotent per ctx.operationId: replaying the same operation returns the same reservation. */
   reserve(
     ctx: AdapterContext,
-    req: { siteId: string; slotId: string; caseId: string },
+    req: { siteId: string; slotId: string; caseId: string; actionType: ActionType },
   ): Promise<ReservationResult>;
   cancel(
     ctx: AdapterContext,
     req: { externalRef: string },
   ): Promise<{ status: 'CANCELLED' | 'PENDING' | 'UNKNOWN' }>;
-  /** Look up by operationId/externalRef to resolve an UNKNOWN outcome. */
-  reconcile(ctx: AdapterContext, req: { externalRef?: string }): Promise<ReservationResult>;
+  /** Looks up ctx.operationId to resolve an UNKNOWN outcome. */
+  reconcile(ctx: AdapterContext): Promise<ReservationResult>;
 }
 
 export interface MessagingAdapter {
@@ -71,3 +80,6 @@ export interface EvidenceSourceAdapter {
     headers: Record<string, string | undefined>,
   ): Promise<NormalizedProviderEvent>;
 }
+
+export * from './sandbox-booking';
+export * from './manual-booking';

@@ -35,7 +35,11 @@ export const AppConfig = z.object({
   MAX_CONTACT_ATTEMPTS: z.coerce.number().int().min(0).max(5).default(2),
   MAX_CASE_AUDIO_SECONDS: z.coerce.number().int().min(0).max(600).default(180),
   CLOUD_TASKS_QUEUE: z.string().min(1).default('careloop-jobs'),
-  WORKER_URL: z.string().url().optional(),
+  /** local-http: in-process delivery to WORKER_URL for development. cloud-tasks: deployed. */
+  TASK_QUEUE_MODE: z.enum(['local-http', 'cloud-tasks']).default('local-http'),
+  /** Service account Cloud Tasks uses to mint OIDC tokens for the worker. */
+  TASKS_INVOKER_EMAIL: z.string().optional(),
+  WORKER_URL: z.string().url().default('http://127.0.0.1:8081'),
   FIRESTORE_EMULATOR_HOST: z.string().optional(),
 });
 export type AppConfig = z.infer<typeof AppConfig>;
@@ -47,6 +51,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     throw new Error(`Invalid configuration: ${issues}`);
   }
   const cfg = parsed.data;
+  if (cfg.TASK_QUEUE_MODE === 'cloud-tasks' && !cfg.TASKS_INVOKER_EMAIL) {
+    throw new Error('TASKS_INVOKER_EMAIL is required when TASK_QUEUE_MODE=cloud-tasks');
+  }
   if (cfg.OUTREACH_ENABLED && cfg.APP_ENV !== 'pilot') {
     throw new Error('OUTREACH_ENABLED=true is only allowed when APP_ENV=pilot');
   }

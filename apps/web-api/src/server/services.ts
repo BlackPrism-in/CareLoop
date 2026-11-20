@@ -1,27 +1,33 @@
 import 'server-only';
 import { loadConfig } from '@careloop/contracts';
-import { CaseCommands, CaseQueries, FirestoreStore } from '@careloop/domain';
+import { CaseQueries, type CaseCommands } from '@careloop/domain';
+import { createJobRuntime, JobQueries, type JobRuntime } from '@careloop/jobs';
+import { createLogger } from '@careloop/observability';
 import { firestore } from './firebase';
 
-let commands: CaseCommands | undefined;
+let runtime: JobRuntime | undefined;
 let reads: CaseQueries | undefined;
+let jobReads: JobQueries | undefined;
 
-export function caseCommands(): CaseCommands {
-  if (!commands) {
-    const cfg = loadConfig();
-    commands = new CaseCommands({
-      store: new FirestoreStore(firestore()),
-      config: {
-        outreachEnabled: cfg.OUTREACH_ENABLED,
-        maxContactAttempts: cfg.MAX_CONTACT_ATTEMPTS,
-        maxCaseAudioSeconds: cfg.MAX_CASE_AUDIO_SECONDS,
-      },
-    });
-  }
-  return commands;
+export function jobRuntime(): JobRuntime {
+  if (!runtime)
+    runtime = createJobRuntime(loadConfig(), firestore(), createLogger('careloop-web-api'));
+  return runtime;
 }
+
+export const caseCommands = (): CaseCommands => jobRuntime().commands;
 
 export function queries(): CaseQueries {
   if (!reads) reads = new CaseQueries(firestore());
   return reads;
+}
+
+export function jobQueries(): JobQueries {
+  if (!jobReads) jobReads = new JobQueries(firestore());
+  return jobReads;
+}
+
+/** Best-effort: push this case's new outbox items to the queue now; the sweep covers failures. */
+export async function kick(tenantId: string, caseId: string): Promise<void> {
+  await jobRuntime().dispatcher.dispatchCase(tenantId, caseId);
 }

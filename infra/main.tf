@@ -1,4 +1,8 @@
+data "google_project" "this" {}
+
 locals {
+  # Cloud Run's deterministic URL avoids a self-reference cycle for WORKER_URL.
+  worker_url = "https://careloop-worker-${data.google_project.this.number}.${var.region}.run.app"
   services = [
     "run.googleapis.com",
     "firestore.googleapis.com",
@@ -9,6 +13,7 @@ locals {
     "identitytoolkit.googleapis.com",
     "logging.googleapis.com",
     "monitoring.googleapis.com",
+    "cloudscheduler.googleapis.com",
   ]
   common_env = {
     APP_ENV                = var.app_env
@@ -28,6 +33,9 @@ locals {
     MAX_CONTACT_ATTEMPTS   = "2"
     MAX_CASE_AUDIO_SECONDS = "180"
     CLOUD_TASKS_QUEUE      = google_cloud_tasks_queue.jobs.name
+    TASK_QUEUE_MODE        = "cloud-tasks"
+    TASKS_INVOKER_EMAIL    = google_service_account.svc["tasks-invoker"].email
+    WORKER_URL             = local.worker_url
   }
 }
 
@@ -86,6 +94,23 @@ resource "google_secret_manager_secret" "secrets" {
   replication {
     user_managed {
       replicas { location = var.region }
+    }
+  }
+  depends_on = [google_project_service.apis]
+}
+
+# Recovery sweep (MVP spec §16): re-dispatches undispatched or stuck outbox items.
+resource "google_cloud_scheduler_job" "recovery_sweep" {
+  name      = "careloop-recovery-sweep"
+  region    = var.region
+  schedule  = "* * * * *"
+  time_zone = "Asia/Kolkata"
+  http_target {
+    uri         = "${local.worker_url}/tasks/recovery-sweep"
+    http_method = "POST"
+    oidc_token {
+      service_account_email = google_service_account.svc["tasks-invoker"].email
+      audience              = local.worker_url
     }
   }
   depends_on = [google_project_service.apis]

@@ -34,7 +34,17 @@ for (const p of bundle.patients) batch.set(db.doc(tenantRecord(t, 'patients', p.
 for (const c of bundle.consents) batch.set(db.doc(tenantRecord(t, 'consents', c.consentId)), c);
 for (const s of bundle.sources) batch.set(db.doc(tenantRecord(t, 'sources', s.sourceId)), s);
 for (const c of bundle.cases) batch.set(db.doc(tenantRecord(t, 'cases', c.caseId)), c);
-for (const s of bundle.slots) batch.set(db.doc(tenantRecord(t, 'slots', s.slotId)), s);
+// Shift sandbox slots so the earliest is tomorrow, keeping their times of day.
+const DAY = 86_400_000;
+const earliest = Math.min(...bundle.slots.map((s) => Date.parse(s.startsAt)));
+const shift = (Math.floor(Date.now() / DAY) + 1 - Math.floor(earliest / DAY)) * DAY;
+for (const s of bundle.slots) {
+  batch.set(db.doc(tenantRecord(t, 'slots', s.slotId)), {
+    ...s,
+    startsAt: new Date(Date.parse(s.startsAt) + shift).toISOString(),
+    endsAt: new Date(Date.parse(s.endsAt) + shift).toISOString(),
+  });
+}
 await batch.commit();
 
 // Staff logins in the Auth EMULATOR. The tenant is a server-set custom claim;

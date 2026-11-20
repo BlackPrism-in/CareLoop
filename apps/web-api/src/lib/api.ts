@@ -76,4 +76,12 @@ const REASONS: Record<string, string> = {
   BOOKING_MUST_BE_RECONCILED: 'Reconcile the existing booking before editing.',
   NO_CHANGES: 'Nothing changed.',
   SOURCE_AUTHORITY_REQUIRED: 'Enter the upstream authority reference.',
+  SLOT_NOT_OFFERED_BY_ADAPTER: 'That slot is no longer offered. Refresh the slot list.',
+  BOOKING_UNKNOWN_RECONCILE_FIRST:
+    'The last booking outcome is still being checked with the provider.',
+  BOOKING_ALREADY_ACTIVE: 'A booking request is already in progress.',
+  OUTREACH_DISABLED: 'Automated outreach is switched off for this environment.',
+  OUTSIDE_CONTACT_WINDOW: "It's outside the lab's contact hours.",
+  CONTACT_ATTEMPTS_EXHAUSTED: 'The contact attempt budget for this case is used up.',
+  IDENTITY_METHOD_NOT_CONFIGURED: 'No identity verification method is configured for this lab yet.',
 };

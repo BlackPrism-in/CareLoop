@@ -31,6 +31,7 @@ export interface OutboxDraft {
     | 'CONTACT_ATTEMPT'
     | 'BOOKING_REQUEST'
     | 'BOOKING_RECONCILE'
+    | 'BOOKING_CANCEL'
     | 'HANDOFF_NOTIFY'
     | 'SUPPRESS_PENDING_WORK';
   payload: Record<string, unknown>;
@@ -186,7 +187,10 @@ export interface DispatchFacts {
 export function dispatchContact(c: Case, f: DispatchFacts): Transition {
   const isRetry = c.workflowState === 'CONTACTING' && c.outreachDisposition === 'RETRY_SCHEDULED';
   if (!(c.workflowState === 'READY' || isRetry)) requireState(c, ['READY'], 'DISPATCH');
-  if (!f.outreachEnabled) throw guardFailed('OUTREACH_DISABLED');
+  // The kill switch guards contact with real people. A synthetic tenant's
+  // browser-voice session reaches no one, so the demo can run with it off.
+  const simulatedOnly = f.tenant.simulation && f.channel === 'BROWSER_VOICE';
+  if (!f.outreachEnabled && !simulatedOnly) throw guardFailed('OUTREACH_DISABLED');
   if (f.tenant.outreachPaused) throw guardFailed('SITE_PAUSED');
   if (c.automationPausedReason !== null)
     throw guardFailed(`AUTOMATION_PAUSED_${c.automationPausedReason}`);
@@ -375,6 +379,46 @@ export function recordBookingCancelled(
     },
     eventType: 'BOOKING_CANCELLED',
     payload: { externalRef: input.externalRef, rescheduleAllowed: canReschedule },
+  };
+}
+
+/**
+ * The provider (or reconciliation) established that no reservation exists:
+ * slot taken, incompatible, or never reserved. Scheduling can be retried with
+ * another adapter-returned slot. Never used when the outcome is uncertain.
+ */
+export function recordBookingRejected(
+  c: Case,
+  input: { reason: string; operationId: string },
+): Transition {
+  if (c.bookingState !== 'REQUESTED' && c.bookingState !== 'UNKNOWN')
+    throw guardFailed('NO_PENDING_BOOKING_REQUEST');
+  if (!input.reason.trim()) throw guardFailed('REASON_REQUIRED');
+  return {
+    patch: {
+      bookingState: 'NONE',
+      ...(c.automationPausedReason === 'INTEGRATION' ? { automationPausedReason: null } : {}),
+    },
+    eventType: 'BOOKING_REJECTED',
+    payload: { reason: input.reason, operationId: input.operationId },
+  };
+}
+
+/**
+ * Asks the adapter to cancel. The booking stays CONFIRMED until the provider
+ * acknowledges; the patient must not be told it is cancelled before then.
+ */
+export function requestBookingCancellation(
+  c: Case,
+  input: { externalRef: string; reason: string },
+): Transition {
+  if (c.bookingState !== 'CONFIRMED') throw guardFailed('NO_CONFIRMED_BOOKING');
+  if (!input.reason.trim()) throw guardFailed('REASON_REQUIRED');
+  return {
+    patch: {},
+    eventType: 'BOOKING_CANCELLATION_REQUESTED',
+    payload: { externalRef: input.externalRef, reason: input.reason },
+    outbox: [{ kind: 'BOOKING_CANCEL', payload: { externalRef: input.externalRef } }],
   };
 }
 

@@ -27,6 +27,8 @@ export type CommandName =
   | 'confirmBooking'
   | 'markBookingUnknown'
   | 'recordBookingCancelled'
+  | 'recordBookingRejected'
+  | 'requestBookingCancellation'
   | 'awaitEvidence'
   | 'recordSelfReport'
   | 'recordEvidenceReview'
@@ -67,6 +69,8 @@ export const PERMISSIONS: Record<CommandName, Rule> = {
   confirmBooking: plus(staff('COORDINATOR'), 'SYSTEM', 'PROVIDER'),
   markBookingUnknown: { roles: [], actors: ['SYSTEM'] },
   recordBookingCancelled: plus(staff('COORDINATOR'), 'SYSTEM', 'PROVIDER'),
+  recordBookingRejected: plus(staff('COORDINATOR'), 'SYSTEM', 'PROVIDER'),
+  requestBookingCancellation: plus(staff('COORDINATOR'), 'PATIENT'),
   awaitEvidence: plus(staff('COORDINATOR', 'VERIFIER'), 'SYSTEM', 'PROVIDER'),
   recordSelfReport: plus(staff('COORDINATOR'), 'AGENT', 'PATIENT'),
   recordEvidenceReview: plus(staff('VERIFIER'), 'SYSTEM'),

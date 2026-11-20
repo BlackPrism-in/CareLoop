@@ -53,6 +53,7 @@ function resultOf(
   eventId: string,
   eventType: string,
   warnings: string[] = [],
+  operationId: string | null = null,
 ): CommandResult {
   return {
     caseId: c.caseId,
@@ -65,6 +66,7 @@ function resultOf(
     automationPausedReason: c.automationPausedReason,
     eventId,
     eventType,
+    operationId,
     replayed: false,
     warnings,
   };
@@ -163,7 +165,13 @@ export class CaseCommands {
       };
       tx.enqueueOutbox(item);
     });
-    const result = resultOf(after, eventId, args.transition.eventType, args.warnings);
+    const result = resultOf(
+      after,
+      eventId,
+      args.transition.eventType,
+      args.warnings,
+      args.operationId,
+    );
     const op: OperationRecord = {
       operationId: args.operationId,
       command: args.command,
@@ -458,6 +466,24 @@ export class CaseCommands {
       const consent = await this.load(tx.getConsent(c.consentId), 'CONSENT');
       return T.recordBookingCancelled(c, { externalRef: req.input.externalRef, consent, now });
     });
+  }
+
+  recordBookingRejected(
+    ctx: ActorContext,
+    req: CommandRequest<{ reason: string; operationId: string }>,
+  ) {
+    return this.execute(ctx, 'recordBookingRejected', req, (c) =>
+      T.recordBookingRejected(c, req.input),
+    );
+  }
+
+  requestBookingCancellation(
+    ctx: ActorContext,
+    req: CommandRequest<{ externalRef: string; reason: string }>,
+  ) {
+    return this.execute(ctx, 'requestBookingCancellation', req, (c) =>
+      T.requestBookingCancellation(c, req.input),
+    );
   }
 
   awaitEvidence(

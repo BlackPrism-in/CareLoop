@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Case, EventEnvelope } from '@careloop/contracts';
 import { DomainError } from '../errors';
-import { caseEvents, tenantCollection, tenantRecord } from '../paths';
+import { caseEvents, tenantCollection, tenantDoc, tenantRecord } from '../paths';
 import { CaseCommands, type ServiceConfig } from '../service';
 import type { OutboxRecord, Store } from '../store';
 import {
@@ -234,13 +234,19 @@ export function commandSuite(name: string, backend: () => TestBackend) {
     it('MVP-03: respects the outreach kill switch, site pause and contact window', async () => {
       await d.create();
       await d.approve();
+      const tenantPath = tenantDoc(T1);
+      const tenant = (await b.read<Record<string, unknown>>(tenantPath))!;
+      const killed = make({ outreachEnabled: false });
+      // A real (non-simulation) tenant is blocked by the kill switch on every channel.
+      await b.seed(tenantPath, { ...tenant, simulation: false });
       await rejects(
-        new Driver(make({ outreachEnabled: false })).svc.dispatchContact(
-          SYSTEM,
-          d.req({ channel: 'BROWSER_VOICE' as const }),
-        ),
+        killed.dispatchContact(SYSTEM, d.req({ channel: 'BROWSER_VOICE' as const })),
         'OUTREACH_DISABLED',
       );
+      // Site pause blocks even when outreach is enabled.
+      await b.seed(tenantPath, { ...tenant, outreachPaused: true });
+      await rejects(d.dispatch(), 'SITE_PAUSED');
+      await b.seed(tenantPath, tenant);
       now = new Date('2026-11-21T15:00:00Z'); // 20:30 IST
       await rejects(d.dispatch(), 'OUTSIDE_CONTACT_WINDOW');
       now = new Date(START);
@@ -248,6 +254,55 @@ export function commandSuite(name: string, backend: () => TestBackend) {
         svc.dispatchContact(SYSTEM, d.req({ channel: 'WHATSAPP' as const })),
         'CONSENT_NOT_ACTIVE_FOR_CHANNEL',
       );
+    });
+
+    it('a synthetic tenant may run a simulated browser session with outreach disabled, but nothing else', async () => {
+      await d.create();
+      await d.approve();
+      const killed = make({ outreachEnabled: false });
+      await b.seed(tenantRecord(T1, 'consents', 'c1'), {
+        ...(await b.read<object>(tenantRecord(T1, 'consents', 'c1'))),
+        channels: ['BROWSER_VOICE', 'WHATSAPP'],
+      });
+      await rejects(
+        killed.dispatchContact(SYSTEM, d.req({ channel: 'WHATSAPP' as const })),
+        'OUTREACH_DISABLED',
+      );
+      const r = d.track(
+        await killed.dispatchContact(SYSTEM, d.req({ channel: 'BROWSER_VOICE' as const })),
+      );
+      expect(r.workflowState).toBe('CONTACTING');
+      expect((await events()).at(-1)?.simulation).toBe(true);
+    });
+
+    it('a rejected booking returns to scheduling; a late confirmation cannot resurrect a cancellation', async () => {
+      await d.create();
+      await d.approve();
+      await d.dispatch();
+      await d.patientBooks();
+      await d.requestBooking();
+      const rej = d.track(
+        await svc.recordBookingRejected(SYSTEM, d.req({ reason: 'SLOT_TAKEN', operationId: 'op' })),
+      );
+      expect(rej.bookingState).toBe('NONE');
+      expect(rej.workflowState).toBe('AWAITING_BOOKING');
+      await d.requestBooking('slot_2');
+      await d.confirmBooking();
+      const cancelReq = d.track(
+        await svc.requestBookingCancellation(
+          coordinator,
+          d.req({ externalRef: 'booking_1', reason: 'Patient asked' }),
+        ),
+      );
+      expect(cancelReq.bookingState).toBe('CONFIRMED'); // not cancelled until the provider acknowledges
+      expect((await outbox()).map((o) => o.kind)).toContain('BOOKING_CANCEL');
+      const cancelled = d.track(
+        await svc.recordBookingCancelled(SYSTEM, d.req({ externalRef: 'booking_1' })),
+      );
+      expect(cancelled.bookingState).toBe('CANCELLED');
+      expect(cancelled.workflowState).toBe('AWAITING_BOOKING');
+      // A delayed "confirmed" callback must not overwrite the newer cancellation.
+      await rejects(d.confirmBooking(), 'NO_PENDING_BOOKING_REQUEST');
     });
 
     it('MVP-03: the attempt budget is enforced and exhausting it hands off to a human', async () => {
