@@ -74,3 +74,9 @@ variable "patient_app_url" {
   type        = string
   default     = ""
 }
+
+variable "whatsapp_login_fallback_template" {
+  description = "Approved AUTHENTICATION template (English) used while careloop_login_code is not approved. Empty: none."
+  type        = string
+  default     = ""
+}

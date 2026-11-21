@@ -89,6 +89,8 @@ export interface WhatsAppConfig {
   accessToken?: string;
   graphVersion: string;
   testRecipients: string[];
+  /** Approved authentication template to use when careloop_login_code is not usable yet. */
+  loginFallbackTemplate?: string;
 }
 
 export interface SendResult {
@@ -127,6 +129,22 @@ export class WhatsAppSender {
     language: SupportedLanguage;
     params: string[];
   }): Promise<SendResult> {
+    const r = await this.sendOnce(m);
+    // 132001: template missing or not approved (e.g. still in Meta review).
+    if (
+      r.status === 'FAILED' &&
+      m.template === 'LOGIN_CODE' &&
+      this.cfg.loginFallbackTemplate &&
+      /^META_132001/.test(r.reason ?? '')
+    )
+      return this.sendOnce(m, { name: this.cfg.loginFallbackTemplate, language: 'en' });
+    return r;
+  }
+
+  private async sendOnce(
+    m: { to: string; template: PatientTemplate; language: SupportedLanguage; params: string[] },
+    override?: { name: string; language: 'en' | 'hi' },
+  ): Promise<SendResult> {
     if (!E164.test(m.to)) return { status: 'FAILED', reason: 'INVALID_NUMBER' };
     if (!this.live) return { status: 'SIMULATED', reason: 'MESSAGING_SIMULATED' };
     if (!this.allowed(m.to)) return { status: 'SIMULATED', reason: 'NOT_A_TEST_RECIPIENT' };
@@ -155,8 +173,8 @@ export class WhatsAppSender {
             to: m.to.slice(1),
             type: 'template',
             template: {
-              name: def.name,
-              language: { code: templateLanguageFor(def, m.language) },
+              name: override?.name ?? def.name,
+              language: { code: override?.language ?? templateLanguageFor(def, m.language) },
               components,
             },
           }),
@@ -186,6 +204,7 @@ export function whatsAppSenderFor(cfg: {
   WHATSAPP_ACCESS_TOKEN?: string;
   WHATSAPP_GRAPH_VERSION: string;
   WHATSAPP_TEST_RECIPIENTS: string[];
+  WHATSAPP_LOGIN_FALLBACK_TEMPLATE?: string;
 }): WhatsAppSender {
   return new WhatsAppSender({
     mode: cfg.MESSAGING_ADAPTER === 'whatsapp' ? 'whatsapp' : 'simulated',
@@ -194,5 +213,6 @@ export function whatsAppSenderFor(cfg: {
     accessToken: cfg.WHATSAPP_ACCESS_TOKEN,
     graphVersion: cfg.WHATSAPP_GRAPH_VERSION,
     testRecipients: cfg.WHATSAPP_TEST_RECIPIENTS,
+    loginFallbackTemplate: cfg.WHATSAPP_LOGIN_FALLBACK_TEMPLATE,
   });
 }

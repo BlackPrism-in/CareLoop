@@ -46,10 +46,14 @@ locals {
   }
   # WhatsApp sender settings, only when a Meta phone number is configured.
   # web-api and worker only; voice stays on simulated messaging and never gets the token.
-  whatsapp_env = var.whatsapp_phone_number_id == "" ? {} : {
+  whatsapp_env_base = var.whatsapp_phone_number_id == "" ? {} : {
     MESSAGING_ADAPTER        = "whatsapp"
     WHATSAPP_PHONE_NUMBER_ID = var.whatsapp_phone_number_id
     WHATSAPP_TEST_RECIPIENTS = var.whatsapp_test_recipients
+  }
+  whatsapp_env = merge(local.whatsapp_env_base, local.whatsapp_fallback_env)
+  whatsapp_fallback_env = var.whatsapp_phone_number_id == "" || var.whatsapp_login_fallback_template == "" ? {} : {
+    WHATSAPP_LOGIN_FALLBACK_TEMPLATE = var.whatsapp_login_fallback_template
   }
 }
 

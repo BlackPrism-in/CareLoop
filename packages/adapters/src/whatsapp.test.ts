@@ -83,5 +83,33 @@ describe('WhatsAppSender', () => {
     expect(r.reason).toContain('132001');
   });
 
+  it('falls back to an approved login template while ours is in review', async () => {
+    const f = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ error: { code: 132001, message: 'Template not approved' } }),
+          { status: 404 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ messages: [{ id: 'wamid.2' }] }), { status: 200 }),
+      );
+    const r = await new WhatsAppSender(
+      { ...base, loginFallbackTemplate: 'login_code' },
+      f as unknown as typeof fetch,
+    ).send({
+      to: '+919800000001',
+      template: 'LOGIN_CODE',
+      language: 'hi-IN',
+      params: ['123456'],
+    });
+    expect(r).toMatchObject({ status: 'SENT', providerRef: 'wamid.2' });
+    const second = JSON.parse(
+      (f.mock.calls[1] as unknown as [string, RequestInit])[1].body as string,
+    );
+    expect(second.template).toMatchObject({ name: 'login_code', language: { code: 'en' } });
+  });
+
   it('masks numbers for display', () => expect(maskPhone('+919800000101')).toBe('+91 •••••• 0101'));
 });

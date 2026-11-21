@@ -38,6 +38,14 @@ export const AppConfig = z.object({
     .regex(/^\d{6,20}$/)
     .optional(),
   WHATSAPP_ACCESS_TOKEN: z.string().trim().min(20).optional(),
+  /**
+   * An already-approved AUTHENTICATION template (English) on the same account to
+   * use while careloop_login_code is pending or not approved.
+   */
+  WHATSAPP_LOGIN_FALLBACK_TEMPLATE: z
+    .string()
+    .regex(/^[a-z0-9_]{1,512}$/)
+    .optional(),
   WHATSAPP_GRAPH_VERSION: z
     .string()
     .regex(/^v\d+\.\d+$/)
