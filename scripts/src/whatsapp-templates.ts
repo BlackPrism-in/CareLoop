@@ -17,7 +17,9 @@ const arg = (name: string) => {
 };
 const waba = arg('waba');
 const token = process.env.WHATSAPP_ACCESS_TOKEN;
-const version = process.env.WHATSAPP_GRAPH_VERSION ?? 'v23.0';
+const version = process.env.WHATSAPP_GRAPH_VERSION ?? 'v25.0';
+/** Where the invite's button opens: the get-the-app page. */
+const appUrl = arg('app-url') ?? 'https://careloop-web-api-94524397144.asia-south1.run.app/app';
 if (!waba || !/^\d+$/.test(waba) || !token) {
   console.error(
     'Usage: WHATSAPP_ACCESS_TOKEN=... whatsapp-templates --waba <WhatsApp Business Account ID> [--status]',
@@ -30,9 +32,12 @@ const graph = async (path: string, init?: RequestInit) => {
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
   });
   const j = (await r.json()) as Record<string, unknown> & {
-    error?: { message?: string; code?: number };
+    error?: { message?: string; code?: number; error_user_msg?: string };
   };
-  if (!r.ok) throw new Error(`Meta ${j.error?.code ?? r.status}: ${j.error?.message ?? 'error'}`);
+  if (!r.ok)
+    throw new Error(
+      `Meta ${j.error?.code ?? r.status}: ${j.error?.error_user_msg ?? j.error?.message ?? 'error'}`,
+    );
   return j;
 };
 
@@ -63,7 +68,17 @@ for (const def of Object.values(PATIENT_TEMPLATES)) {
             { type: 'FOOTER', code_expiration_minutes: 10 },
             { type: 'BUTTONS', buttons: [{ type: 'OTP', otp_type: 'COPY_CODE' }] },
           ]
-        : [{ type: 'BODY', text: def.body[language], example: { body_text: [def.examples] } }];
+        : [
+            { type: 'BODY', text: def.body[language], example: { body_text: [def.examples] } },
+            ...(def.urlButton
+              ? [
+                  {
+                    type: 'BUTTONS',
+                    buttons: [{ type: 'URL', text: def.urlButton[language], url: appUrl }],
+                  },
+                ]
+              : []),
+          ];
     try {
       const r = await graph(`${waba}/message_templates`, {
         method: 'POST',

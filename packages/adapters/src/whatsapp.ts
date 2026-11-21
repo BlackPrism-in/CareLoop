@@ -18,6 +18,8 @@ export interface TemplateDef {
   body: Partial<Record<'en' | 'hi', string>>;
   /** Example values for template review, one per placeholder. */
   examples: string[];
+  /** Static link button (no parameters at send time); its URL is set when the template is submitted. */
+  urlButton?: Record<'en' | 'hi', string>;
 }
 
 export const PATIENT_TEMPLATES: Record<PatientTemplate, TemplateDef> = {
@@ -28,13 +30,16 @@ export const PATIENT_TEMPLATES: Record<PatientTemplate, TemplateDef> = {
     examples: ['482913'],
   },
   FOLLOWUP_INVITE: {
-    name: 'careloop_followup_invite',
+    // v1 ("careloop_followup_invite") was rejected by Meta as INCORRECT_CATEGORY:
+    // it read as an app promotion. This one is about the specific ordered follow-up.
+    name: 'careloop_followup_due',
     category: 'UTILITY',
     body: {
-      en: 'Hello. {{1}} has asked CareLoop to help you arrange your {{2}}, due by {{3}}. Open the CareLoop app at {{4}} and sign in with this WhatsApp number to choose a time or ask the lab to call you.',
-      hi: 'नमस्ते। {{1}} ने CareLoop से आपकी {{2}} तय करने में मदद करने को कहा है, जो {{3}} तक होनी है। CareLoop ऐप {{4}} खोलें और इसी WhatsApp नंबर से साइन इन करके समय चुनें या लैब से कॉल का अनुरोध करें।',
+      en: 'Follow-up reminder from {{1}}: your {{2}} is due by {{3}}. Please choose an appointment time, or ask the lab to call you. Sign in with this WhatsApp number.',
+      hi: 'फ़ॉलो-अप सूचना ({{1}}): आपकी {{2}} {{3}} तक होनी है। कृपया अपॉइंटमेंट का समय चुनें या लैब से कॉल का अनुरोध करें। इसी WhatsApp नंबर से साइन इन करें।',
     },
-    examples: ['Demo Diagnostics', 'consultation', '28 Nov', 'https://example.com/app'],
+    examples: ['Demo Diagnostics', 'consultation', '28 Nov'],
+    urlButton: { en: 'Choose a time', hi: 'समय चुनें' },
   },
   BOOKING_CONFIRMED: {
     name: 'careloop_booking_confirmed',

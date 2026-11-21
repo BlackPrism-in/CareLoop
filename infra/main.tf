@@ -30,7 +30,6 @@ locals {
     LIVE_MODEL_ID          = var.model_ids.live
     BOOKING_ADAPTER        = var.app_env == "pilot" ? "manual" : "sandbox"
     VOICE_ADAPTER          = "browser"
-    MESSAGING_ADAPTER      = var.whatsapp_phone_number_id == "" ? "simulated" : "whatsapp"
     OUTREACH_ENABLED       = tostring(var.outreach_enabled)
     REQUIRE_STAFF_MFA      = var.app_env == "pilot" ? "true" : "false"
     MAX_CONTACT_ATTEMPTS   = "2"
@@ -46,7 +45,9 @@ locals {
     PATIENT_APP_URL        = var.patient_app_url == "" ? "${local.web_url}/app" : var.patient_app_url
   }
   # WhatsApp sender settings, only when a Meta phone number is configured.
+  # web-api and worker only; voice stays on simulated messaging and never gets the token.
   whatsapp_env = var.whatsapp_phone_number_id == "" ? {} : {
+    MESSAGING_ADAPTER        = "whatsapp"
     WHATSAPP_PHONE_NUMBER_ID = var.whatsapp_phone_number_id
     WHATSAPP_TEST_RECIPIENTS = var.whatsapp_test_recipients
   }

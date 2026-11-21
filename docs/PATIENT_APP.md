@@ -17,7 +17,7 @@ The app never shows names, reports or staff notes, and never gives medical advic
 | When | Template | Sent by |
 |---|---|---|
 | Sign-in | `careloop_login_code` (authentication, copy-code button) | web-api |
-| Staff click **Send WhatsApp invite** on an approved case | `careloop_followup_invite` (with the app link) | worker |
+| Staff click **Send WhatsApp invite** on an approved case | `careloop_followup_due` (button: Choose a time → app page) | worker |
 | The calendar confirms a booking | `careloop_booking_confirmed` | worker |
 | 2–26 hours before the visit, in contact hours | `careloop_visit_reminder` | worker (scheduler sweep) |
 
@@ -42,6 +42,13 @@ To link another tester's number to a synthetic patient:
 ```bash
 pnpm --filter @careloop/scripts link-whatsapp --patient pat_demo_02 --phone +91XXXXXXXXXX --project careloop-demo-2611 --confirm careloop-demo-2611
 ```
+
+## Live setup (demo, 21 Nov 2026)
+- Sender: BlackPrism **+91 70014 41439** (Phone number ID `1267308809792402`), shared with PrismGo.
+- Meta app **CareLoop** (`1711105943973360`), system user **careloop-api** with the BlackPrism WhatsApp account *and* its Messaging account assigned. In Meta's newer setup the **Messaging account ID `2039642930247736`** is what the API uses for templates (`--waba 2039642930247736`); the WhatsApp account ID shown in Business settings is refused.
+- Only `+917318724249` is allowed (`whatsapp_test_recipients`).
+- `careloop_followup_invite` was rejected as INCORRECT_CATEGORY (it read as app promotion); replaced by `careloop_followup_due`. Meta filed its Hindi version as MARKETING.
+- A separate test sender (+1 555 175 2558) exists on the CareLoop app but never finished registration; it is unused.
 
 ## Turn on real WhatsApp
 1. **You (Meta Business):** in WhatsApp Manager, note the **WhatsApp Business Account ID** and the sender's **Phone number ID**. Meta's free test number works for up to 5 recipient numbers you verify there.

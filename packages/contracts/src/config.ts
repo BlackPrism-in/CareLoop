@@ -37,11 +37,11 @@ export const AppConfig = z.object({
     .string()
     .regex(/^\d{6,20}$/)
     .optional(),
-  WHATSAPP_ACCESS_TOKEN: z.string().min(20).optional(),
+  WHATSAPP_ACCESS_TOKEN: z.string().trim().min(20).optional(),
   WHATSAPP_GRAPH_VERSION: z
     .string()
     .regex(/^v\d+\.\d+$/)
-    .default('v23.0'),
+    .default('v25.0'),
   /**
    * Outside the pilot, WhatsApp is sent ONLY to these numbers (comma-separated
    * E.164, e.g. +919800000000): testers' own phones linked to synthetic patients.

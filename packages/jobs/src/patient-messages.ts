@@ -119,7 +119,6 @@ export class PatientMessenger {
             tenant.displayName,
             kind,
             fmt(c.dueAt, tz, c.language, { day: 'numeric', month: 'short' }),
-            this.deps.appUrl,
           ]
         : [kind, place, day, time];
 
