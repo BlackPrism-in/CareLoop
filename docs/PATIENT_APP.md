@@ -47,7 +47,7 @@ pnpm --filter @careloop/scripts link-whatsapp --patient pat_demo_02 --phone +91X
 - Sender: BlackPrism **+91 70014 41439** (Phone number ID `1267308809792402`), shared with PrismGo.
 - Meta app **CareLoop** (`1711105943973360`), system user **careloop-api** with the BlackPrism WhatsApp account *and* its Messaging account assigned. In Meta's newer setup the **Messaging account ID `2039642930247736`** is what the API uses for templates (`--waba 2039642930247736`); the WhatsApp account ID shown in Business settings is refused.
 - Only `+917318724249` is allowed (`whatsapp_test_recipients`).
-- `careloop_followup_invite` was rejected as INCORRECT_CATEGORY (it read as app promotion); replaced by `careloop_followup_due`. Meta filed its Hindi version as MARKETING.
+- `careloop_followup_invite` was rejected as INCORRECT_CATEGORY (it read as app promotion); replaced by `careloop_followup_due`. Meta filed its Hindi version as MARKETING (paid), so it was deleted: the follow-up goes out in English only. The template script deletes anything Meta files as MARKETING.
 - A separate test sender (+1 555 175 2558) exists on the CareLoop app but never finished registration; it is unused.
 
 ## Turn on real WhatsApp

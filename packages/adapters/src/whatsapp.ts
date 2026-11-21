@@ -18,6 +18,8 @@ export interface TemplateDef {
   body: Partial<Record<'en' | 'hi', string>>;
   /** Example values for template review, one per placeholder. */
   examples: string[];
+  /** Languages registered with Meta (default en + hi). Others fall back to English. */
+  languages?: readonly ('en' | 'hi')[];
   /** Static link button (no parameters at send time); its URL is set when the template is submitted. */
   urlButton?: Record<'en' | 'hi', string>;
 }
@@ -39,6 +41,8 @@ export const PATIENT_TEMPLATES: Record<PatientTemplate, TemplateDef> = {
       hi: 'फ़ॉलो-अप सूचना ({{1}}): आपकी {{2}} {{3}} तक होनी है। कृपया अपॉइंटमेंट का समय चुनें या लैब से कॉल का अनुरोध करें। इसी WhatsApp नंबर से साइन इन करें।',
     },
     examples: ['Demo Diagnostics', 'consultation', '28 Nov'],
+    // Meta filed the Hindi version as MARKETING (paid); it was deleted. English only.
+    languages: ['en'],
     urlButton: { en: 'Choose a time', hi: 'समय चुनें' },
   },
   BOOKING_CONFIRMED: {
@@ -64,6 +68,12 @@ export const PATIENT_TEMPLATES: Record<PatientTemplate, TemplateDef> = {
 /** Meta template language for a patient language. Bengali falls back to English until reviewed. */
 export function templateLanguage(l: SupportedLanguage): 'en' | 'hi' {
   return l === 'hi-IN' ? 'hi' : 'en';
+}
+
+/** The template language actually registered for this template. */
+export function templateLanguageFor(def: TemplateDef, l: SupportedLanguage): 'en' | 'hi' {
+  const want = templateLanguage(l);
+  return (def.languages ?? ['en', 'hi']).includes(want) ? want : 'en';
 }
 
 /** Words for the follow-up kind inside templates. */
@@ -146,7 +156,7 @@ export class WhatsAppSender {
             type: 'template',
             template: {
               name: def.name,
-              language: { code: templateLanguage(m.language) },
+              language: { code: templateLanguageFor(def, m.language) },
               components,
             },
           }),

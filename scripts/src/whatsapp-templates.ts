@@ -49,6 +49,9 @@ const existing = (
 ).data.filter((t) => t.name.startsWith('careloop_'));
 
 if (process.argv.includes('--status')) {
+  const marketing = existing.filter((t) => t.category === 'MARKETING');
+  if (marketing.length)
+    console.log(`WARNING: ${marketing.length} careloop_ template(s) are MARKETING (paid).`);
   for (const t of existing)
     console.log(`${t.status.padEnd(10)} ${t.name} (${t.language}, ${t.category})`);
   if (!existing.length) console.log('No careloop_ templates yet.');
@@ -56,7 +59,7 @@ if (process.argv.includes('--status')) {
 }
 
 for (const def of Object.values(PATIENT_TEMPLATES)) {
-  for (const language of ['en', 'hi'] as const) {
+  for (const language of def.languages ?? (['en', 'hi'] as const)) {
     if (existing.some((t) => t.name === def.name && t.language === language)) {
       console.log(`exists     ${def.name} (${language})`);
       continue;
@@ -84,6 +87,14 @@ for (const def of Object.values(PATIENT_TEMPLATES)) {
         method: 'POST',
         body: JSON.stringify({ name: def.name, language, category: def.category, components }),
       });
+      // No paid MARKETING templates: if Meta re-files one as marketing, delete it.
+      if (r.category === 'MARKETING' && typeof r.id === 'string') {
+        await graph(`${waba}/message_templates?name=${def.name}&hsm_id=${r.id}`, {
+          method: 'DELETE',
+        });
+        console.log(`DELETED    ${def.name} (${language}): Meta filed it as MARKETING (paid)`);
+        continue;
+      }
       console.log(`submitted  ${def.name} (${language}): ${String(r.status ?? 'PENDING')}`);
     } catch (e) {
       console.log(`FAILED     ${def.name} (${language}): ${(e as Error).message}`);

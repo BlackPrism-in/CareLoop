@@ -1,6 +1,8 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import type { Case, Consent, Site, Tenant } from '@careloop/contracts';
 import {
+  PATIENT_TEMPLATES,
+  templateLanguageFor,
   followUpWord,
   maskPhone,
   type PatientTemplate,
@@ -108,18 +110,17 @@ export class PatientMessenger {
     const tenant = tenantSnap.data() as Tenant;
     const site = siteSnap.data() as Site | undefined;
     const tz = site?.timeZone ?? tenant.timeZone;
-    const kind = followUpWord(c.actionType, c.language);
+    // Words inside the message must match the template language actually used.
+    const lang =
+      templateLanguageFor(PATIENT_TEMPLATES[template], c.language) === 'hi' ? 'hi-IN' : 'en-IN';
+    const kind = followUpWord(c.actionType, lang);
     const place = site?.displayName ?? tenant.displayName;
     const at = c.bookedStartsAt ?? c.dueAt;
-    const day = fmt(at, tz, c.language, { weekday: 'short', day: 'numeric', month: 'short' });
-    const time = fmt(at, tz, c.language, { hour: 'numeric', minute: '2-digit' });
+    const day = fmt(at, tz, lang, { weekday: 'short', day: 'numeric', month: 'short' });
+    const time = fmt(at, tz, lang, { hour: 'numeric', minute: '2-digit' });
     const params =
       template === 'FOLLOWUP_INVITE'
-        ? [
-            tenant.displayName,
-            kind,
-            fmt(c.dueAt, tz, c.language, { day: 'numeric', month: 'short' }),
-          ]
+        ? [tenant.displayName, kind, fmt(c.dueAt, tz, lang, { day: 'numeric', month: 'short' })]
         : [kind, place, day, time];
 
     const r = await whatsapp.send({ to: phone, template, language: c.language, params });
